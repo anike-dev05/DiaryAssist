@@ -1,55 +1,39 @@
-Sure, here's the modified code to handle risk segments as categorical variables with values A, B, C, D, and E:
+To identify the causal effect of each variable on the bad rate change in your credit card analytics data, you can use causal inference methods. One popular approach is the Difference-in-Differences (DiD) method. Here's a conceptual code outline using Python and the `causalnex` library for DiD analysis:
 
 ```python
-import pandas as pd
-import matplotlib.pyplot as plt
+from causalnex.structure import StructureModel
+from causalnex.inference import InferenceEngine
+from causalnex.structure.notears import from_pandas
+from causalnex.discretiser import Discretiser
+from sklearn.preprocessing import LabelEncoder
 
-# Step 1: Calculate Weighted Average Bad Rate
-def calculate_weighted_average_bad_rate(data):
-    weighted_bad_rate = (data['risk_seg'].astype('category').cat.codes * data['bad_rate']).sum() / data['risk_seg'].astype('category').cat.codes.sum()
-    return weighted_bad_rate
+# Load your credit card analytics data into a DataFrame
+data = pd.read_csv("credit_card_data.csv")
 
-# Step 2: Track Changes Over Time
-def plot_bad_rate_over_time(dates, bad_rates):
-    plt.plot(dates, bad_rates)
-    plt.xlabel('Date')
-    plt.ylabel('Weighted Average Bad Rate')
-    plt.title('Bad Rate Over Time')
-    plt.show()
+# Preprocess data: handle missing values, encode categorical variables, etc.
+# For example, encode categorical variables
+label_encoder = LabelEncoder()
+data['encoded_categorical_var'] = label_encoder.fit_transform(data['categorical_var'])
 
-# Step 3: Analyze Segment Changes
-def analyze_segment_changes(data):
-    segment_changes = data.groupby('month')['risk_seg'].value_counts(normalize=True)
-    return segment_changes
+# Create a StructureModel and learn the structure of causal relationships
+sm = from_pandas(data)
 
-# Step 4: Segment-level Analysis
-def analyze_segment_level_changes(data):
-    segment_level_changes = data.groupby(['month', 'risk_seg'])['bad_rate'].mean()
-    return segment_level_changes
+# Discretise continuous variables if needed
+discretised_data = Discretiser(method="equalwidth").transform(data[['continuous_var']])
 
-# Step 5: Correlation Analysis
-def correlation_analysis(data):
-    correlation = data.corr()
-    return correlation
+# Add the discretised variables to the structure model
+sm.add_nodes_from(discretised_data.columns)
+sm.add_edges_from([(col, "bad_rate") for col in discretised_data.columns])
 
-# Example usage:
-# Load your data into a DataFrame
-# data = pd.read_csv('credit_card_data.csv')
+# Perform causal inference
+ie = InferenceEngine(sm)
+# Here you can query for the causal effect of each variable on the bad rate change
+causal_effects = ie.query()
 
-# Step 1
-weighted_average_bad_rate = calculate_weighted_average_bad_rate(data)
-
-# Step 2
-# plot_bad_rate_over_time(data['date'], data['weighted_average_bad_rate'])
-
-# Step 3
-# segment_changes = analyze_segment_changes(data)
-
-# Step 4
-# segment_level_changes = analyze_segment_level_changes(data)
-
-# Step 5
-# correlation = correlation_analysis(data)
+# Print the causal effects
+print("Causal effects on bad rate change:")
+for variable, effect in causal_effects.items():
+    print(f"{variable}: {effect}")
 ```
 
-This code now correctly handles the risk segment variable as categorical with values A, B, C, D, and E. Make sure to adjust the column names accordingly based on your actual data.
+This code outlines how you can use the `causalnex` library to perform causal inference and estimate the causal effect of each variable on the bad rate change. Make sure to preprocess your data appropriately and handle any necessary transformations before applying the causal inference techniques. Adjustments may be needed based on your specific data and requirements.
