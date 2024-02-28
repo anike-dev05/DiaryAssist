@@ -1,34 +1,28 @@
-To identify the causal effect of each variable on the bad rate change in your credit card analytics data using Bayesian networks, you can use the `pgmpy` library. Bayesian networks allow for probabilistic reasoning and inference about causal relationships between variables. Here's a conceptual code outline using Python and `pgmpy`:
+If you don't have access to the `pgmpy` library, you can use the `synthcity` library for implementing Bayesian networks. Here's how you can create a Bayesian network and perform causal inference using `synthcity`:
 
 ```python
-from pgmpy.models import BayesianModel
-from pgmpy.estimators import BayesianEstimator
-from pgmpy.inference import VariableElimination
+from synthcity import DirectedGraph
+from synthcity.inference import BayesianNetworkInference
 import pandas as pd
 
 # Load your credit card analytics data into a DataFrame
 data = pd.read_csv("credit_card_data.csv")
 
-# Define your Bayesian Network structure based on prior knowledge or expert input
-# For demonstration purposes, let's assume a simple Bayesian Network structure
-# where each variable may directly influence the 'bad_rate'
-model = BayesianModel([('var1', 'bad_rate'), ('var2', 'bad_rate'), ('var3', 'bad_rate')])
+# Create a directed graph to represent the Bayesian network structure
+# Here, you'll define the edges based on your domain knowledge or assumptions
+graph = DirectedGraph()
+# Add edges based on your domain knowledge or assumptions
+# For demonstration purposes, let's assume a simple structure where each variable directly influences 'bad_rate'
+graph.add_edge('var1', 'bad_rate')
+graph.add_edge('var2', 'bad_rate')
+graph.add_edge('var3', 'bad_rate')
 
-# Estimate the parameters of the model from data
-estimator = BayesianEstimator(model, data)
-model.fit(data, estimator=estimator)
+# Instantiate BayesianNetworkInference with your data and the graph structure
+bn_inference = BayesianNetworkInference(data, graph)
 
 # Perform inference to calculate the causal effect of each variable on 'bad_rate'
-inference = VariableElimination(model)
-
-# Query for the causal effect of each variable on 'bad_rate'
-causal_effects = {}
-for variable in data.columns:
-    if variable != 'bad_rate':
-        query_variable = [variable]
-        evidence = {'bad_rate': None}  # No evidence on 'bad_rate' initially
-        causal_effect = inference.query(variables=query_variable, evidence=evidence)['bad_rate']
-        causal_effects[variable] = causal_effect
+# Here, you can specify the variables for which you want to calculate the causal effect
+causal_effects = bn_inference.get_causal_effects(['var1', 'var2', 'var3'], 'bad_rate')
 
 # Print the causal effects
 print("Causal effects on bad rate change:")
@@ -36,4 +30,4 @@ for variable, effect in causal_effects.items():
     print(f"{variable}: {effect}")
 ```
 
-This code outlines how to create a Bayesian network, estimate its parameters from data, and perform inference to calculate the causal effect of each variable on the 'bad_rate' using the `pgmpy` library. Adjust the network structure and model estimation method based on your specific data and domain knowledge.
+This code outlines how to create a Bayesian network structure using `synthcity`, instantiate BayesianNetworkInference with your data and graph structure, and then calculate the causal effect of each variable on the 'bad_rate'. Adjust the graph structure based on your specific domain knowledge or assumptions.
