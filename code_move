@@ -1,34 +1,34 @@
-To identify the causal effect of each variable on the bad rate change in your credit card analytics data, you can use causal inference methods. One popular approach is the Difference-in-Differences (DiD) method. Here's a conceptual code outline using Python and the `causalnex` library for DiD analysis:
+To identify the causal effect of each variable on the bad rate change in your credit card analytics data using Bayesian networks, you can use the `pgmpy` library. Bayesian networks allow for probabilistic reasoning and inference about causal relationships between variables. Here's a conceptual code outline using Python and `pgmpy`:
 
 ```python
-from causalnex.structure import StructureModel
-from causalnex.inference import InferenceEngine
-from causalnex.structure.notears import from_pandas
-from causalnex.discretiser import Discretiser
-from sklearn.preprocessing import LabelEncoder
+from pgmpy.models import BayesianModel
+from pgmpy.estimators import BayesianEstimator
+from pgmpy.inference import VariableElimination
+import pandas as pd
 
 # Load your credit card analytics data into a DataFrame
 data = pd.read_csv("credit_card_data.csv")
 
-# Preprocess data: handle missing values, encode categorical variables, etc.
-# For example, encode categorical variables
-label_encoder = LabelEncoder()
-data['encoded_categorical_var'] = label_encoder.fit_transform(data['categorical_var'])
+# Define your Bayesian Network structure based on prior knowledge or expert input
+# For demonstration purposes, let's assume a simple Bayesian Network structure
+# where each variable may directly influence the 'bad_rate'
+model = BayesianModel([('var1', 'bad_rate'), ('var2', 'bad_rate'), ('var3', 'bad_rate')])
 
-# Create a StructureModel and learn the structure of causal relationships
-sm = from_pandas(data)
+# Estimate the parameters of the model from data
+estimator = BayesianEstimator(model, data)
+model.fit(data, estimator=estimator)
 
-# Discretise continuous variables if needed
-discretised_data = Discretiser(method="equalwidth").transform(data[['continuous_var']])
+# Perform inference to calculate the causal effect of each variable on 'bad_rate'
+inference = VariableElimination(model)
 
-# Add the discretised variables to the structure model
-sm.add_nodes_from(discretised_data.columns)
-sm.add_edges_from([(col, "bad_rate") for col in discretised_data.columns])
-
-# Perform causal inference
-ie = InferenceEngine(sm)
-# Here you can query for the causal effect of each variable on the bad rate change
-causal_effects = ie.query()
+# Query for the causal effect of each variable on 'bad_rate'
+causal_effects = {}
+for variable in data.columns:
+    if variable != 'bad_rate':
+        query_variable = [variable]
+        evidence = {'bad_rate': None}  # No evidence on 'bad_rate' initially
+        causal_effect = inference.query(variables=query_variable, evidence=evidence)['bad_rate']
+        causal_effects[variable] = causal_effect
 
 # Print the causal effects
 print("Causal effects on bad rate change:")
@@ -36,4 +36,4 @@ for variable, effect in causal_effects.items():
     print(f"{variable}: {effect}")
 ```
 
-This code outlines how you can use the `causalnex` library to perform causal inference and estimate the causal effect of each variable on the bad rate change. Make sure to preprocess your data appropriately and handle any necessary transformations before applying the causal inference techniques. Adjustments may be needed based on your specific data and requirements.
+This code outlines how to create a Bayesian network, estimate its parameters from data, and perform inference to calculate the causal effect of each variable on the 'bad_rate' using the `pgmpy` library. Adjust the network structure and model estimation method based on your specific data and domain knowledge.
