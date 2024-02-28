@@ -1,33 +1,35 @@
-If you don't have access to the `pgmpy` library, you can use the `synthcity` library for implementing Bayesian networks. Here's how you can create a Bayesian network and perform causal inference using `synthcity`:
-
-```python
-from synthcity import DirectedGraph
-from synthcity.inference import BayesianNetworkInference
 import pandas as pd
 
 # Load your credit card analytics data into a DataFrame
 data = pd.read_csv("credit_card_data.csv")
 
-# Create a directed graph to represent the Bayesian network structure
-# Here, you'll define the edges based on your domain knowledge or assumptions
-graph = DirectedGraph()
-# Add edges based on your domain knowledge or assumptions
-# For demonstration purposes, let's assume a simple structure where each variable directly influences 'bad_rate'
-graph.add_edge('var1', 'bad_rate')
-graph.add_edge('var2', 'bad_rate')
-graph.add_edge('var3', 'bad_rate')
+# Define a function to calculate conditional probabilities
+def conditional_probability(data, var1, var2, value1, value2):
+    total_count = len(data)
+    var1_count = len(data[data[var1] == value1])
+    var2_count_given_var1 = len(data[(data[var1] == value1) & (data[var2] == value2)])
+    return var2_count_given_var1 / var1_count if var1_count > 0 else 0
 
-# Instantiate BayesianNetworkInference with your data and the graph structure
-bn_inference = BayesianNetworkInference(data, graph)
+# Define a function to perform inference on the Bayesian network
+def bayesian_network_inference(data, target_variable, variables_of_interest):
+    causal_effects = {}
+    for var in variables_of_interest:
+        if var != target_variable:
+            # Calculate P(var|target_variable)
+            p_var_given_target = conditional_probability(data, target_variable, var, 1, 1)
+            # Calculate P(var)
+            p_var = data[var].mean()
+            # Calculate P(target_variable|var)
+            p_target_given_var = conditional_probability(data, var, target_variable, 1, 1)
+            # Calculate the causal effect of var on target_variable
+            causal_effect = p_var_given_target / p_var * p_target_given_var
+            causal_effects[var] = causal_effect
+    return causal_effects
 
 # Perform inference to calculate the causal effect of each variable on 'bad_rate'
-# Here, you can specify the variables for which you want to calculate the causal effect
-causal_effects = bn_inference.get_causal_effects(['var1', 'var2', 'var3'], 'bad_rate')
+causal_effects = bayesian_network_inference(data, 'bad_rate', data.columns)
 
 # Print the causal effects
 print("Causal effects on bad rate change:")
 for variable, effect in causal_effects.items():
     print(f"{variable}: {effect}")
-```
-
-This code outlines how to create a Bayesian network structure using `synthcity`, instantiate BayesianNetworkInference with your data and graph structure, and then calculate the causal effect of each variable on the 'bad_rate'. Adjust the graph structure based on your specific domain knowledge or assumptions.
