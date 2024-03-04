@@ -1,35 +1,37 @@
-import pandas as pd
+Certainly! We can use the elbow method to find the optimal number of clusters. Here's how you can do it in Python:
 
-# Load your credit card analytics data into a DataFrame
-data = pd.read_csv("credit_card_data.csv")
+```python
+import matplotlib.pyplot as plt
+import numpy as np
 
-# Define a function to calculate conditional probabilities
-def conditional_probability(data, var1, var2, value1, value2):
-    total_count = len(data)
-    var1_count = len(data[data[var1] == value1])
-    var2_count_given_var1 = len(data[(data[var1] == value1) & (data[var2] == value2)])
-    return var2_count_given_var1 / var1_count if var1_count > 0 else 0
+# Assuming your data is in a DataFrame named 'df'
+# Replace 'df' with the name of your DataFrame if different
 
-# Define a function to perform inference on the Bayesian network
-def bayesian_network_inference(data, target_variable, variables_of_interest):
-    causal_effects = {}
-    for var in variables_of_interest:
-        if var != target_variable:
-            # Calculate P(var|target_variable)
-            p_var_given_target = conditional_probability(data, target_variable, var, 1, 1)
-            # Calculate P(var)
-            p_var = data[var].mean()
-            # Calculate P(target_variable|var)
-            p_target_given_var = conditional_probability(data, var, target_variable, 1, 1)
-            # Calculate the causal effect of var on target_variable
-            causal_effect = p_var_given_target / p_var * p_target_given_var
-            causal_effects[var] = causal_effect
-    return causal_effects
+# Selecting the features for clustering (excluding the account number)
+X = df.iloc[:, 1:]
 
-# Perform inference to calculate the causal effect of each variable on 'bad_rate'
-causal_effects = bayesian_network_inference(data, 'bad_rate', data.columns)
+# Initializing an empty list to store the sum of squared distances
+sse = []
 
-# Print the causal effects
-print("Causal effects on bad rate change:")
-for variable, effect in causal_effects.items():
-    print(f"{variable}: {effect}")
+# Trying different values of k from 1 to 10
+for k in range(1, 11):
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(X)
+    sse.append(kmeans.inertia_)
+
+# Plotting the elbow curve
+plt.figure(figsize=(8, 6))
+plt.plot(range(1, 11), sse, marker='o')
+plt.xlabel('Number of Clusters')
+plt.ylabel('Sum of Squared Distances')
+plt.title('Elbow Method')
+plt.xticks(np.arange(1, 11, 1))
+plt.grid(True)
+plt.show()
+```
+
+In this code:
+- We iterate over different values of `k` (number of clusters) from 1 to 10.
+- For each value of `k`, we fit a KMeans model and calculate the sum of squared distances of samples to their closest cluster center (`inertia_`).
+- We store these values in the `sse` list.
+- Finally, we plot the elbow curve to visualize the relationship between the number of clusters and the sum of squared distances. The optimal number of clusters can be chosen based on the point where the curve starts to bend or level off, resembling an "elbow".
