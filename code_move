@@ -1,4 +1,4 @@
-To convert the SAS-like conditional logic provided for assigning values to the `waterfall` column based on the `Exclusion`, `cc_appl_status_code`, and `cc_decl_rson_1` columns into PySpark code, you'll need to handle multiple conditions using `when` and `otherwise` functions. Here's how you can do it:
+To convert the SAS code snippet into PySpark code, you can use the `when` and `otherwise` functions to assign values to the `Bureau_Status` column based on the condition `br_age_oldst_acc > 2`. Here’s how you can do it:
 
 ```python
 from pyspark.sql import SparkSession
@@ -6,29 +6,19 @@ from pyspark.sql.functions import col, when
 
 # Assuming you have a SparkSession named 'spark'
 spark = SparkSession.builder \
-    .appName("Waterfall Processing") \
+    .appName("Bureau Status Processing") \
     .getOrCreate()
 
 # Assuming you have a DataFrame named 'df' containing the relevant columns
-# Exclusion, cc_appl_status_code, cc_decl_rson_1
+# br_age_oldst_acc
 
 df = spark.read.csv("path_to_your_data.csv", header=True)  # Adjust as per your data source
 
-# Applying the conditions
-df = df.withColumn("waterfall",
-    when(col("Exclusion").startswith("1 AGE EXCL"), "Age Exclusion: Age of Primary Applicant less than 21 or greater than 65")
-    .when(col("Exclusion").startswith("2 . EXCL"), "DBR Exclusion: Debt Burden Ratio > 50")
-    .when(col("Exclusion") == "3 . OTHER PRODUCTS EXCL", "Other Products Exclusion: Customers have other products like AME")
-    .when(col("Exclusion") == "4.NAEL CUSTOMERS LT 6 MTHS EXCL", "NAEL Exclusion: NAEL customers with less than 6 months relationship with the bank")
-    .when(col("Exclusion") == "5 BUREAU DELQ EXCL", "Bureau Delinquency Exclusion: Customers having bureau delinquency greater than 1")
-    .when(col("Exclusion") == "6 INCOME RELATED EXCL", "Income Exclusion: Monthly Income less than 7.5k AED")
-    .when((col("Exclusion") == "7 APPROVED BUT NOT BOOKED") & (col("cc_appl_status_code").isin("PFD", "COM")), "Not Booked Exclusion: Accounts that are approved but eventually not Booked")
-    .when((col("Exclusion") == "7 APPROVED BUT NOT BOOKED") & (~col("cc_appl_status_code").isin("PFD", "COM")) & (~col("cc_decl_rson_1").isin("SX")), "Other Policy Decline")
-    .otherwise("Score Rejects")
+# Applying the condition
+df = df.withColumn("Bureau_Status",
+    when(col("br_age_oldst_acc") > 2, "Vintage Bureau")
+    .otherwise("New_to_Bureau")
 )
-
-# Filter out rows where Exclusion is "8.Included"
-df = df.filter(col("Exclusion") != "8.Included")
 
 # Show the resulting DataFrame
 df.show()
@@ -39,19 +29,16 @@ df.show()
 1. **Reading Data**: Assumes you read your data into a DataFrame `df`.
 
 2. **Column Operations**:
-   - `.withColumn("waterfall", ...)` adds a new column "waterfall" based on the conditions.
+   - `.withColumn("Bureau_Status", ...)` adds a new column "Bureau_Status" based on the conditions.
 
-3. **Conditions**:
-   - `when(col("Exclusion").startswith("1 AGE EXCL"), "...")` checks if `Exclusion` starts with "1 AGE EXCL" and assigns the corresponding descriptive string to the `waterfall` column.
-   - `col("Exclusion").startswith("2 . EXCL")` checks if `Exclusion` starts with "2 . EXCL".
-   - `col("Exclusion") == "3 . OTHER PRODUCTS EXCL"` checks if `Exclusion` exactly matches "3 . OTHER PRODUCTS EXCL".
-   - Similar checks are applied for other conditions using `when` functions.
-   - `col("cc_appl_status_code").isin("PFD", "COM")` checks if `cc_appl_status_code` is either "PFD" or "COM".
-   - `~col("cc_appl_status_code").isin("PFD", "COM")` checks if `cc_appl_status_code` is not "PFD" or "COM".
-   - `col("cc_decl_rson_1").isin("SX")` checks if `cc_decl_rson_1` is "SX".
+3. **Condition**:
+   - `when(col("br_age_oldst_acc") > 2, "Vintage Bureau")` checks if the value in the `br_age_oldst_acc` column is greater than 2. If true, assigns "Vintage Bureau" to `Bureau_Status`.
+   - `.otherwise("New_to_Bureau")` assigns "New_to_Bureau" to `Bureau_Status` when the condition is not met (i.e., when `br_age_oldst_acc` is not greater than 2).
 
 4. **Result**:
-   - The `waterfall` column in the resulting DataFrame will reflect a descriptive message based on the combination of conditions specified.
+   - The `Bureau_Status` column in the resulting DataFrame will reflect "Vintage Bureau" for rows where `br_age_oldst_acc` > 2, and "New_to_Bureau" otherwise.
 
-5. **Filtering**:
-   - `df.filter(col
+5. **Output**:
+   - Finally, `.show()` displays the resulting DataFrame with the "Bureau_Status" column populated accordingly.
+
+Make sure to replace `"path_to_your_data.csv"` with the actual path to your data file or adjust the DataFrame creation part (`df = ...`) to match your data loading process. Adjust column names (`col("
