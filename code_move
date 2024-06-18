@@ -1,4 +1,4 @@
-To convert the SAS code snippet for assigning values to the `waterfall` column based on conditions into PySpark code, you can follow the approach below:
+To convert the provided SAS-like conditional logic for assigning values to the `waterfall` column based on the `Exclusion` column into PySpark code, you can use a similar approach as before but with expanded conditions and string assignment. Here's how you can do it:
 
 ```python
 from pyspark.sql import SparkSession
@@ -10,14 +10,18 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # Assuming you have a DataFrame named 'df' containing the relevant columns
-# cc_decl_rson_1
+# Exclusion
 
 df = spark.read.csv("path_to_your_data.csv", header=True)  # Adjust as per your data source
 
 # Applying the conditions
 df = df.withColumn("waterfall",
-    when(col("cc_decl_rson_1") == "SX", "Score Rejects")
-    .when(~col("cc_decl_rson_1").isin("SX"), "Stability Accepts")
+    when(col("Exclusion") == "1.AGE EXCL", "Age Exclusion: Age of Primary Applicant less than 21 or greater than 65")
+    .when(col("Exclusion") == "2.DBR EXCL", "DBR Exclusion: Debt Burden Ratio > 50")
+    .when(col("Exclusion") == "3.OTHER PRODUCTS EXCL", "Other Products Exclusion: Customers have other products like AME")
+    .when(col("Exclusion") == "4.NAEL CUSTOMERS LT 6 MTHS EXCL", "NAEL Exclusion: NAEL customers with less than 6 months relationship with the bank")
+    .when(col("Exclusion") == "5.BUREAU DELQ EXCL", "Bureau Delinquency Exclusion: Customers having bureau delinquency greater than 1")
+    .when(col("Exclusion") == "6.INCOME RELATED EXCL", "Income Exclusion: Monthly Income less than 7.5k AED")
     .otherwise("Check the application exclusion")
 )
 
@@ -33,12 +37,10 @@ df.show()
    - `.withColumn("waterfall", ...)` adds a new column "waterfall" based on the conditions.
 
 3. **Conditions**:
-   - `when` and `otherwise` functions are used for conditional operations.
-   - `col("cc_decl_rson_1") == "SX"` checks if the value in column `cc_decl_rson_1` is equal to "SX".
-   - `~col("cc_decl_rson_1").isin("SX")` checks if the value in column `cc_decl_rson_1` is not in the list containing only "SX".
-   - `otherwise("Check the application exclusion")` sets the default value if none of the conditions match.
+   - `when(col("Exclusion") == "...", "...")` checks the value in the `Exclusion` column and assigns the corresponding descriptive string to the `waterfall` column.
 
 4. **Result**:
-   - The `waterfall` column in the resulting DataFrame will reflect one of the three possible values based on the conditions.
+   - The `waterfall` column in the resulting DataFrame will reflect a descriptive message based on the value of `Exclusion`.
 
-5.
+5. **Output**:
+   - Finally, `.show()` displays the resulting DataFrame with the "waterfall" column populated
