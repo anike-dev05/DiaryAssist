@@ -1,4 +1,4 @@
-To convert the provided SAS-like conditional logic for assigning values to the `waterfall` column based on the `Exclusion` column into PySpark code, you can use a similar approach as before but with expanded conditions and string assignment. Here's how you can do it:
+To convert the provided SAS-like conditional logic for assigning values to the `waterfall` column based on the `Exclusion`, `cc_appl_status_code`, `cc_decl_rson_1`, and `bad_ind` columns into PySpark code, you'll need to handle multiple conditions using `when` and `otherwise` functions. Here's how you can do it:
 
 ```python
 from pyspark.sql import SparkSession
@@ -10,19 +10,23 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # Assuming you have a DataFrame named 'df' containing the relevant columns
-# Exclusion
+# Exclusion, cc_appl_status_code, cc_decl_rson_1, bad_ind
 
 df = spark.read.csv("path_to_your_data.csv", header=True)  # Adjust as per your data source
 
 # Applying the conditions
 df = df.withColumn("waterfall",
-    when(col("Exclusion") == "1.AGE EXCL", "Age Exclusion: Age of Primary Applicant less than 21 or greater than 65")
-    .when(col("Exclusion") == "2.DBR EXCL", "DBR Exclusion: Debt Burden Ratio > 50")
-    .when(col("Exclusion") == "3.OTHER PRODUCTS EXCL", "Other Products Exclusion: Customers have other products like AME")
-    .when(col("Exclusion") == "4.NAEL CUSTOMERS LT 6 MTHS EXCL", "NAEL Exclusion: NAEL customers with less than 6 months relationship with the bank")
-    .when(col("Exclusion") == "5.BUREAU DELQ EXCL", "Bureau Delinquency Exclusion: Customers having bureau delinquency greater than 1")
-    .when(col("Exclusion") == "6.INCOME RELATED EXCL", "Income Exclusion: Monthly Income less than 7.5k AED")
-    .otherwise("Check the application exclusion")
+    when(col("Exclusion") == "1 AGE EXCL", "Age Exclusion: Age of Primary Applicant less than 21 or greater than 65")
+    .when(col("Exclusion") == "2 DBR EXCL", "DBR Exclusion: Debt Burden Ratio > 50")
+    .when(col("Exclusion") == "3 OTHER PRODUCTS EXCL", "Other Products Exclusion: Customers have other products like AME")
+    .when(col("Exclusion") == "4 NAEL, CUSTOMERS LT 6 MTHS EXCL", "NAEL Exclusion: NAEL customers with less than 6 months relationship with the bank")
+    .when(col("Exclusion") == "5 BUREAU DELQ EXCL", "Bureau Delinquency Exclusion: Customers having bureau delinquency greater than 1")
+    .when(col("Exclusion") == "6 INCOME RELATED EXCL", "Income Exclusion: Monthly Income less than 7.5k AED")
+    .when((col("Exclusion") == "7 APPROVED BUT NOT BOOKED") & (col("cc_appl_status_code").isin("PFD", "COM")), "Not Booked Exclusion: Accounts that are approved but eventually not Booked")
+    .when((col("Exclusion") == "7 APPROVED BUT NOT BOOKED") & (~col("cc_appl_status_code").isin("PFD", "COM")) & (~col("cc_decl_rson_1").isin("SK")), "Other Policy Decline")
+    .when((col("Exclusion") == "8. Included") & (col("bad_ind") == 0), "KGB Good")
+    .when((col("Exclusion") == "8. Included") & (col("bad_ind") == 1), "KGB Bad")
+    .otherwise("Score Rejects")
 )
 
 # Show the resulting DataFrame
@@ -38,9 +42,17 @@ df.show()
 
 3. **Conditions**:
    - `when(col("Exclusion") == "...", "...")` checks the value in the `Exclusion` column and assigns the corresponding descriptive string to the `waterfall` column.
+   - `col("cc_appl_status_code").isin("PFD", "COM")` checks if `cc_appl_status_code` is either "PFD" or "COM".
+   - `~col("cc_appl_status_code").isin("PFD", "COM")` checks if `cc_appl_status_code` is not "PFD" or "COM".
+   - `col("cc_decl_rson_1").isin("SK")` checks if `cc_decl_rson_1` is "SK".
+   - `col("bad_ind") == 0` checks if `bad_ind` equals 0.
 
 4. **Result**:
-   - The `waterfall` column in the resulting DataFrame will reflect a descriptive message based on the value of `Exclusion`.
+   - The `waterfall` column in the resulting DataFrame will reflect a descriptive message based on the combination of conditions specified.
 
 5. **Output**:
-   - Finally, `.show()` displays the resulting DataFrame with the "waterfall" column populated
+   - Finally, `.show()` displays the resulting DataFrame with the "waterfall" column populated accordingly.
+
+Make sure to replace `"path_to_your_data.csv"` with the actual path to your data file or adjust the DataFrame creation part (`df = ...`) to match your data loading process. Adjust column names (`col("column_name")`) as per your actual DataFrame schema.
+
+This conversion handles all specified conditions from the SAS logic and translates them into equivalent PySpark DataFrame operations using `when` and `otherwise` functions. Adjust the conditions and messages as necessary based on your specific requirements and DataFrame schema.
