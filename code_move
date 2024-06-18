@@ -1,21 +1,24 @@
-g div ibjo
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, when
 
-```python
-def calculate_quadrilateral_area(x_coordinates, y_coordinates):
-    # Check if the number of coordinates is valid
-    if len(x_coordinates) != 4 or len(y_coordinates) != 4:
-        return "Error: Please provide exactly four coordinates."
+# Assuming 'df' is your PySpark DataFrame
 
-    # Calculate the area using the shoelace formula
-    area = 0.5 * abs(sum(x_coordinates[i] * y_coordinates[i + 1] - x_coordinates[i + 1] * y_coordinates[i] for i in range(3)) +
-                    x_coordinates[3] * y_coordinates[0] - x_coordinates[0] * y_coordinates[3])
+# Define conditions and corresponding exclusions
+conditions = [
+    (col("n_age_of_prim_appl") < 21) | (col("n_age_of_prim_appl") > 65, "1.AGE EXCL"),
+    (col("p_dbt_brdn_ratio") > 50, "2.DBR EXCL"),
+    (col("CC_HUB_PROD").isin('AME', 'HML'), "3.OTHER PRODUCTS EXCL"),
+    (col("CC_MON_WITH_HSBC") < 6) & (~col("cc_package_code").isin('A', 'F', 'G', 'H', '', None), "4.NAEL CUSTOMERS LT 6 MTHS EXCL"),
+    (col("br_wrst_del_112m") > 1, "5.BUREAU DELQ EXCL"),
+    ((col("a_tot_anul_inc") / 12) < 7500, "6.INCOME RELATED EXCL")
+]
 
-    return area
+# Applying the conditions
+for condition, exclusion_label in conditions:
+    df = df.withColumn("Exclusion", when(condition, exclusion_label))
 
-# Example usage:
-x_coords = [0, 4, 6, 2]
-y_coords = [0, 3, 7, 4]
-print("Area of the quadrilateral:", calculate_quadrilateral_area(x_coords, y_coords))
-```
+# Default case if none of the conditions match
+df = df.withColumn("Exclusion", when(col("Exclusion").isNull(), "8.Included").otherwise(col("Exclusion")))
 
-Replace `x_coords` and `y_coords` with your coordinates in the form of lists of X and Y coordinates respectively.
+# Show or further process the DataFrame
+df.show()
