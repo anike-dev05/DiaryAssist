@@ -1,34 +1,24 @@
-To convert the provided SAS-like conditional logic into PySpark code, we'll use DataFrame operations and functions available in PySpark. Below is the translated logic:
+To convert the SAS code snippet for assigning values to the `waterfall` column based on conditions into PySpark code, you can follow the approach below:
 
 ```python
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when, lit
+from pyspark.sql.functions import col, when
 
 # Assuming you have a SparkSession named 'spark'
 spark = SparkSession.builder \
-    .appName("Exclusion Processing") \
+    .appName("Waterfall Processing") \
     .getOrCreate()
 
 # Assuming you have a DataFrame named 'df' containing the relevant columns
-# n_age_of_prim_app1, n_age_of_prim_appl, p_dbt_brdn_ratio, CC_HUB_PROD,
-# CC_MON_WITH_HSBC, co_package_code, br_wrst_del_112m, a_tot_anul_inc,
-# limit0, limit1, ..., limit9
+# cc_decl_rson_1
 
 df = spark.read.csv("path_to_your_data.csv", header=True)  # Adjust as per your data source
 
 # Applying the conditions
-df = df.withColumn("Exclusion",
-    when((col("n_age_of_prim_app1") < 21) | (col("n_age_of_prim_appl") > 65), "1.AGE EXCL")
-    .when(col("p_dbt_brdn_ratio") > 50, "2.DBR EXCL")
-    .when(col("CC_HUB_PROD").isin("AME", "HML"), "3.OTHER PRODUCTS EXCL")
-    .when((col("CC_MON_WITH_HSBC") < 6) & (~col("co_package_code").isin("A", "F", "", "", "", "")), "4.NAEL CUSTOMERS LT 6 MTHS EXCL")
-    .when(col("br_wrst_del_112m") > 1, "5.BUREAU DELQ EXCL")
-    .when((col("a_tot_anul_inc")/12) < 7500, "6. INCOME RELATED EXCL")
-    .when((col("limit0").isNull()) & (col("limit1").isNull()) & (col("limit2").isNull()) & 
-          (col("limit3").isNull()) & (col("limit4").isNull()) & (col("limit5").isNull()) &
-          (col("limit6").isNull()) & (col("limit7").isNull()) & (col("limits").isNull()) &
-          (col("limit9").isNull()), "7.APPROVED BUT NOT BOOKED")
-    .otherwise("8. Included")
+df = df.withColumn("waterfall",
+    when(col("cc_decl_rson_1") == "SX", "Score Rejects")
+    .when(~col("cc_decl_rson_1").isin("SX"), "Stability Accepts")
+    .otherwise("Check the application exclusion")
 )
 
 # Show the resulting DataFrame
@@ -39,19 +29,16 @@ df.show()
 
 1. **Reading Data**: Assumes you read your data into a DataFrame `df`.
 
-2. **Column Operations**: 
+2. **Column Operations**:
+   - `.withColumn("waterfall", ...)` adds a new column "waterfall" based on the conditions.
+
+3. **Conditions**:
    - `when` and `otherwise` functions are used for conditional operations.
-   - `.withColumn("Exclusion", ...)` adds a new column "Exclusion" based on the conditions.
+   - `col("cc_decl_rson_1") == "SX"` checks if the value in column `cc_decl_rson_1` is equal to "SX".
+   - `~col("cc_decl_rson_1").isin("SX")` checks if the value in column `cc_decl_rson_1` is not in the list containing only "SX".
+   - `otherwise("Check the application exclusion")` sets the default value if none of the conditions match.
 
-3. **Conditions**: 
-   - Each `when` function checks a specific condition using PySpark's `col()` function to refer to DataFrame columns.
-   - `isin()` is used to check membership in a list of values.
-   - Logical operators like `&` (AND) and `|` (OR) are used to combine conditions.
+4. **Result**:
+   - The `waterfall` column in the resulting DataFrame will reflect one of the three possible values based on the conditions.
 
-4. **Result**: 
-   - If none of the conditions in `when` match, `otherwise` sets the value to "8. Included".
-
-5. **Output**: 
-   - Finally, `.show()` displays the resulting DataFrame with the "Exclusion" column reflecting the appropriate exclusion reason based on the conditions.
-
-Make sure to replace `"path_to_y
+5.
