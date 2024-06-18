@@ -1,24 +1,57 @@
+To convert the provided SAS-like conditional logic into PySpark code, we'll use DataFrame operations and functions available in PySpark. Below is the translated logic:
+
+```python
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when
+from pyspark.sql.functions import col, when, lit
 
-# Assuming 'df' is your PySpark DataFrame
+# Assuming you have a SparkSession named 'spark'
+spark = SparkSession.builder \
+    .appName("Exclusion Processing") \
+    .getOrCreate()
 
-# Define conditions and corresponding exclusions
-conditions = [
-    (col("n_age_of_prim_appl") < 21) | (col("n_age_of_prim_appl") > 65, "1.AGE EXCL"),
-    (col("p_dbt_brdn_ratio") > 50, "2.DBR EXCL"),
-    (col("CC_HUB_PROD").isin('AME', 'HML'), "3.OTHER PRODUCTS EXCL"),
-    (col("CC_MON_WITH_HSBC") < 6) & (~col("cc_package_code").isin('A', 'F', 'G', 'H', '', None), "4.NAEL CUSTOMERS LT 6 MTHS EXCL"),
-    (col("br_wrst_del_112m") > 1, "5.BUREAU DELQ EXCL"),
-    ((col("a_tot_anul_inc") / 12) < 7500, "6.INCOME RELATED EXCL")
-]
+# Assuming you have a DataFrame named 'df' containing the relevant columns
+# n_age_of_prim_app1, n_age_of_prim_appl, p_dbt_brdn_ratio, CC_HUB_PROD,
+# CC_MON_WITH_HSBC, co_package_code, br_wrst_del_112m, a_tot_anul_inc,
+# limit0, limit1, ..., limit9
+
+df = spark.read.csv("path_to_your_data.csv", header=True)  # Adjust as per your data source
 
 # Applying the conditions
-for condition, exclusion_label in conditions:
-    df = df.withColumn("Exclusion", when(condition, exclusion_label))
+df = df.withColumn("Exclusion",
+    when((col("n_age_of_prim_app1") < 21) | (col("n_age_of_prim_appl") > 65), "1.AGE EXCL")
+    .when(col("p_dbt_brdn_ratio") > 50, "2.DBR EXCL")
+    .when(col("CC_HUB_PROD").isin("AME", "HML"), "3.OTHER PRODUCTS EXCL")
+    .when((col("CC_MON_WITH_HSBC") < 6) & (~col("co_package_code").isin("A", "F", "", "", "", "")), "4.NAEL CUSTOMERS LT 6 MTHS EXCL")
+    .when(col("br_wrst_del_112m") > 1, "5.BUREAU DELQ EXCL")
+    .when((col("a_tot_anul_inc")/12) < 7500, "6. INCOME RELATED EXCL")
+    .when((col("limit0").isNull()) & (col("limit1").isNull()) & (col("limit2").isNull()) & 
+          (col("limit3").isNull()) & (col("limit4").isNull()) & (col("limit5").isNull()) &
+          (col("limit6").isNull()) & (col("limit7").isNull()) & (col("limits").isNull()) &
+          (col("limit9").isNull()), "7.APPROVED BUT NOT BOOKED")
+    .otherwise("8. Included")
+)
 
-# Default case if none of the conditions match
-df = df.withColumn("Exclusion", when(col("Exclusion").isNull(), "8.Included").otherwise(col("Exclusion")))
-
-# Show or further process the DataFrame
+# Show the resulting DataFrame
 df.show()
+```
+
+### Explanation:
+
+1. **Reading Data**: Assumes you read your data into a DataFrame `df`.
+
+2. **Column Operations**: 
+   - `when` and `otherwise` functions are used for conditional operations.
+   - `.withColumn("Exclusion", ...)` adds a new column "Exclusion" based on the conditions.
+
+3. **Conditions**: 
+   - Each `when` function checks a specific condition using PySpark's `col()` function to refer to DataFrame columns.
+   - `isin()` is used to check membership in a list of values.
+   - Logical operators like `&` (AND) and `|` (OR) are used to combine conditions.
+
+4. **Result**: 
+   - If none of the conditions in `when` match, `otherwise` sets the value to "8. Included".
+
+5. **Output**: 
+   - Finally, `.show()` displays the resulting DataFrame with the "Exclusion" column reflecting the appropriate exclusion reason based on the conditions.
+
+Make sure to replace `"path_to_y
