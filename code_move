@@ -1,6 +1,3 @@
-To convert the given SAS code to PySpark, you need to handle the logic of checking and converting the column `_cc_period_rqd_mnths` based on whether it contains 'M', 'm', or neither. Here's how you can achieve this in PySpark:
-
-```python
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, expr, when
 
@@ -9,32 +6,17 @@ spark = SparkSession.builder \
     .appName("SAS to PySpark conversion") \
     .getOrCreate()
 
-# Assuming '_cc_period_rqd_mnths' is a column in your DataFrame
+# Assuming 'p_dbt_brdn_ratio' is a column in your DataFrame
 # Load your DataFrame here, replace with your actual DataFrame loading code
 # df = spark.read.csv("path_to_your_file.csv", header=True)
 
 # Applying the conversion logic
 df = df.withColumn(
-    'cc_period_rqd_mnths',
-    when(col('_cc_period_rqd_mnths').contains('M'),
-         expr("cast(regexp_replace(_cc_period_rqd_mnths, 'M', '') as double)"))
-    .when(col('_cc_period_rqd_mnths').contains('m'),
-         expr("cast(regexp_replace(_cc_period_rqd_mnths, 'm', '') as double)"))
-    .otherwise(col('_cc_period_rqd_mnths').cast('double'))
+    'p_dbt_brdn_ratio',
+    when(col('p_dbt_brdn_ratio').isNull() | (col('p_dbt_brdn_ratio') == ''),
+         expr("0").cast('double'))
+    .otherwise(col('p_dbt_brdn_ratio').cast('double'))
 )
 
 # Display the transformed DataFrame
 df.show()
-```
-
-### Explanation:
-1. **SparkSession**: Start a Spark session if not already started.
-2. **Loading Data**: Replace `df = spark.read.csv("path_to_your_file.csv", header=True)` with your actual code to load the DataFrame.
-3. **Column Transformation**:
-   - Use `withColumn()` to create or replace the column `cc_period_rqd_mnths` based on conditions.
-   - `when(col('_cc_period_rqd_mnths').contains('M'), ...)` checks if '_cc_period_rqd_mnths' contains 'M'. If true, it replaces 'M' with an empty string and casts the result to `double`.
-   - `when(col('_cc_period_rqd_mnths').contains('m'), ...)` checks if '_cc_period_rqd_mnths' contains 'm'. If true, it replaces 'm' with an empty string and casts the result to `double`.
-   - `.otherwise(col('_cc_period_rqd_mnths').cast('double'))` handles the case when neither 'M' nor 'm' is found, simply casting `_cc_period_rqd_mnths` to `double`.
-4. **Show DataFrame**: Use `df.show()` to display the transformed DataFrame. Adjust or replace this according to your further processing needs.
-
-Make sure to adjust the loading part (`spark.read`) and any other operations around this code snippet based on your actual data source and requirements.
