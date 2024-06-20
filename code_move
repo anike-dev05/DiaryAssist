@@ -1,27 +1,11 @@
-To convert the provided SAS code snippet into PySpark, we need to handle conditional logic and date calculations using PySpark functions. Here’s how you can translate the logic step-by-step:
-
-```python
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, expr, when, datediff, current_date
-
-# Assuming you have a SparkSession named 'spark'
-spark = SparkSession.builder \
-    .appName("SAS to PySpark conversion") \
-    .getOrCreate()
-
-# Assuming 'D_CURR_EMPL_SINCE_DTE' and 'D_CPTR_DTE' are columns in your DataFrame
-# Load your DataFrame here, replace with your actual DataFrame loading code
-# df = spark.read.csv("path_to_your_file.csv", header=True)
-
-# Define the current date as a constant
-current_date_expr = current_date()
+df = df.withColumn('current_date_col', lit(current_date()))
 
 # Applying the conversion logic
 df = df.withColumn(
     'MONTHS_IN_CURR_JOB',
     when((col('D_CURR_EMPL_SINCE_DTE').isNull()) | (col('D_CURR_EMPL_SINCE_DTE') == ''),
          expr("0").cast('integer'))
-    .otherwise(expr("months_between(current_date(), D_CURR_EMPL_SINCE_DTE) / 30").cast('integer'))
+    .otherwise(expr("floor(datediff(current_date_col, D_CURR_EMPL_SINCE_DTE) / 30)").cast('integer'))
 )
 
 df = df.withColumn(
@@ -30,22 +14,5 @@ df = df.withColumn(
     .otherwise(col('MONTHS_IN_CURR_JOB'))
 )
 
-# Display the transformed DataFrame
-df.show()
-```
-
-### Explanation:
-1. **SparkSession**: Start a Spark session if not already started.
-2. **Loading Data**: Replace `df = spark.read.csv("path_to_your_file.csv", header=True)` with your actual code to load the DataFrame.
-3. **Column Transformation**:
-   - Use `withColumn()` to create or replace the column `MONTHS_IN_CURR_JOB` based on conditions.
-   - First, handle the case where `D_CURR_EMPL_SINCE_DTE` is null or empty (`''`). If true, assign `0` to `MONTHS_IN_CURR_JOB`.
-   - Otherwise, calculate the difference in months between the current date (`current_date()`) and `D_CURR_EMPL_SINCE_DTE` using `months_between()` function, then divide by `30` to approximate the number of months.
-   - Cast the result to `integer` to get whole months.
-   - Then, apply another `withColumn()` to handle the condition where `MONTHS_IN_CURR_JOB` is less than `0`. If true, set `MONTHS_IN_CURR_JOB` to `0`.
-4. **Show DataFrame**: Use `df.show()` to display the transformed DataFrame. Adjust or replace this according to your further processing needs.
-
-### Notes:
-- Adjust the date format (`D_CURR_EMPL_SINCE_DTE` and `D_CPTR_DTE`) and any other column names as per your actual DataFrame schema.
-- The `months_between()` function computes the difference between two dates in months, and dividing by `30` approximates this difference in days.
-- Ensure that the logic around handling null or missing values (`isNull()` or `== ''`) and date calculations (`months_between()`) aligns with your specific data and requirements.
+# Drop the temporary current_date_col column if needed
+df = df.drop('current_date_col')
