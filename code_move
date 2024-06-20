@@ -1,17 +1,15 @@
+
 from pyspark.sql import functions as F
 
-# Assuming df is your DataFrame and the columns are 'D_CURR_EMPL_SINCE_DTE' and 'D_CPTR_DTE'
+# Assuming df is your DataFrame and the column is '_n_time_at_curr_addr'
 
-df = df.withColumn("MONTHS_IN_CURR_JOB",
-                   F.when(
-                       F.col("D_CURR_EMPL_SINCE_DTE").isNull() | (F.col("D_CURR_EMPL_SINCE_DTE") == ".D"),
-                       0
-                   ).otherwise(
-                       F.when(
-                           (F.months_between(F.col("D_CPTR_DTE"), F.col("D_CURR_EMPL_SINCE_DTE")) + 1) < 0,
-                           0
-                       ).otherwise(
-                           F.months_between(F.col("D_CPTR_DTE"), F.col("D_CURR_EMPL_SINCE_DTE")) + 1
-                       )
-                   )
-                  )
+df = df.withColumn(
+    "Months_in_Current_Address",
+    (F.floor(F.col("_n_time_at_curr_addr") / 100) * 12) + (F.col("_n_time_at_curr_addr") % 100)
+)
+
+# Drop the old column if necessary
+df = df.drop("_n_time_at_curr_addr")
+
+# Show the updated DataFrame
+df.show()
