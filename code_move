@@ -1,39 +1,40 @@
-To convert the SAS expression `weighted_bad_flag = bad_ind * weight;` into PySpark, you can directly use DataFrame operations to compute the product of `bad_ind` and `weight` columns. Here's how you can implement it:
+To convert the given SAS code to PySpark, you need to handle the logic of checking and converting the column `_cc_period_rqd_mnths` based on whether it contains 'M', 'm', or neither. Here's how you can achieve this in PySpark:
 
 ```python
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, expr, when
 
 # Assuming you have a SparkSession named 'spark'
 spark = SparkSession.builder \
-    .appName("Weighted Bad Flag Calculation") \
+    .appName("SAS to PySpark conversion") \
     .getOrCreate()
 
-# Assuming you have a DataFrame named 'df' containing the relevant columns
-# bad_ind, weight
+# Assuming '_cc_period_rqd_mnths' is a column in your DataFrame
+# Load your DataFrame here, replace with your actual DataFrame loading code
+# df = spark.read.csv("path_to_your_file.csv", header=True)
 
-df = spark.read.csv("path_to_your_data.csv", header=True)  # Adjust as per your data source
+# Applying the conversion logic
+df = df.withColumn(
+    'cc_period_rqd_mnths',
+    when(col('_cc_period_rqd_mnths').contains('M'),
+         expr("cast(regexp_replace(_cc_period_rqd_mnths, 'M', '') as double)"))
+    .when(col('_cc_period_rqd_mnths').contains('m'),
+         expr("cast(regexp_replace(_cc_period_rqd_mnths, 'm', '') as double)"))
+    .otherwise(col('_cc_period_rqd_mnths').cast('double'))
+)
 
-# Adding a new column 'weighted_bad_flag' based on the expression bad_ind * weight
-df = df.withColumn("weighted_bad_flag", col("bad_ind") * col("weight"))
-
-# Show the resulting DataFrame
+# Display the transformed DataFrame
 df.show()
 ```
 
 ### Explanation:
+1. **SparkSession**: Start a Spark session if not already started.
+2. **Loading Data**: Replace `df = spark.read.csv("path_to_your_file.csv", header=True)` with your actual code to load the DataFrame.
+3. **Column Transformation**:
+   - Use `withColumn()` to create or replace the column `cc_period_rqd_mnths` based on conditions.
+   - `when(col('_cc_period_rqd_mnths').contains('M'), ...)` checks if '_cc_period_rqd_mnths' contains 'M'. If true, it replaces 'M' with an empty string and casts the result to `double`.
+   - `when(col('_cc_period_rqd_mnths').contains('m'), ...)` checks if '_cc_period_rqd_mnths' contains 'm'. If true, it replaces 'm' with an empty string and casts the result to `double`.
+   - `.otherwise(col('_cc_period_rqd_mnths').cast('double'))` handles the case when neither 'M' nor 'm' is found, simply casting `_cc_period_rqd_mnths` to `double`.
+4. **Show DataFrame**: Use `df.show()` to display the transformed DataFrame. Adjust or replace this according to your further processing needs.
 
-1. **Reading Data**: Assumes you read your data into a DataFrame `df`.
-
-2. **Column Operation**:
-   - `.withColumn("weighted_bad_flag", col("bad_ind") * col("weight"))` computes the product of `bad_ind` and `weight` columns and adds a new column named "weighted_bad_flag" to the DataFrame `df`.
-
-3. **Result**:
-   - The `weighted_bad_flag` column in the resulting DataFrame will contain the computed values based on the multiplication of `bad_ind` and `weight`.
-
-4. **Output**:
-   - Finally, `.show()` displays the resulting DataFrame with the "weighted_bad_flag" column populated accordingly.
-
-Ensure that your actual DataFrame (`df`) contains columns named `bad_ind` and `weight`, or adjust `col("bad_ind")` and `col("weight")` to match the actual column names in your DataFrame.
-
-This conversion directly translates the SAS arithmetic operation into PySpark DataFrame operations, leveraging PySpark's capabilities to perform element-wise computations efficiently across large datasets. Adjustments may be necessary based on your specific data structure and requirements.
+Make sure to adjust the loading part (`spark.read`) and any other operations around this code snippet based on your actual data source and requirements.
