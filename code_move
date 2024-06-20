@@ -1,18 +1,17 @@
-df = df.withColumn('current_date_col', lit(current_date()))
+from pyspark.sql import functions as F
 
-# Applying the conversion logic
-df = df.withColumn(
-    'MONTHS_IN_CURR_JOB',
-    when((col('D_CURR_EMPL_SINCE_DTE').isNull()) | (col('D_CURR_EMPL_SINCE_DTE') == ''),
-         expr("0").cast('integer'))
-    .otherwise(expr("floor(datediff(current_date_col, D_CURR_EMPL_SINCE_DTE) / 30)").cast('integer'))
-)
+# Assuming df is your DataFrame and the columns are 'D_CURR_EMPL_SINCE_DTE' and 'D_CPTR_DTE'
 
-df = df.withColumn(
-    'MONTHS_IN_CURR_JOB',
-    when(col('MONTHS_IN_CURR_JOB') < 0, expr("0").cast('integer'))
-    .otherwise(col('MONTHS_IN_CURR_JOB'))
-)
-
-# Drop the temporary current_date_col column if needed
-df = df.drop('current_date_col')
+df = df.withColumn("MONTHS_IN_CURR_JOB",
+                   F.when(
+                       F.col("D_CURR_EMPL_SINCE_DTE").isNull() | (F.col("D_CURR_EMPL_SINCE_DTE") == ".D"),
+                       0
+                   ).otherwise(
+                       F.when(
+                           (F.months_between(F.col("D_CPTR_DTE"), F.col("D_CURR_EMPL_SINCE_DTE")) + 1) < 0,
+                           0
+                       ).otherwise(
+                           F.months_between(F.col("D_CPTR_DTE"), F.col("D_CURR_EMPL_SINCE_DTE")) + 1
+                       )
+                   )
+                  )
