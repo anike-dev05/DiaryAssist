@@ -1,51 +1,38 @@
-To convert this SAS code to PySpark, we need to perform several steps:
-1. Compute the sum of the `UTIL` array and count the elements.
-2. Calculate the average `AVUTIL3`.
-3. Find the maximum value among `a_end_crd_lim_cust_m1`, `a_end_crd_lim_cust_m2`, and `a_end_crd_lim_cust_m3`.
-4. Apply the conditional logic to set `AVUTIL3`.
+To convert the given SAS code to PySpark, we need to:
+1. Convert the string column `_cc_mon_with_hsbc` to a numeric column `cc_mon_with_hsbc`.
+2. Replace any missing values (null) in `cc_mon_with_hsbc` with 0.
 
-Here’s how you can achieve this in PySpark:
+Here's how you can achieve this in PySpark:
 
 1. **Initialize Spark Session** if you don't have one already.
 2. **Create an example DataFrame** with the relevant columns.
-3. **Use PySpark functions to perform the computations**.
+3. **Convert the string column to a numeric column** using `cast`.
+4. **Replace missing values** using `fillna`.
 
 Here's the complete PySpark code:
 
 ```python
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, array, sum as _sum, size, when, lit, greatest
+from pyspark.sql.functions import col, when
 
 # Initialize Spark session
 spark = SparkSession.builder.appName("SAS to PySpark").getOrCreate()
 
 # Example DataFrame
 data = [
-    {"UTIL": [10.0, 25.0, 20.0], "a_end_crd_lim_cust_m1": 1000, "a_end_crd_lim_cust_m2": 2000, "a_end_crd_lim_cust_m3": 3000},
-    {"UTIL": [0.0, 25.0, 20.0], "a_end_crd_lim_cust_m1": 0, "a_end_crd_lim_cust_m2": 2000, "a_end_crd_lim_cust_m3": 3000},
-    {"UTIL": [23.3333, 20.0, 0.0], "a_end_crd_lim_cust_m1": 3000, "a_end_crd_lim_cust_m2": 4000, "a_end_crd_lim_cust_m3": None}
+    {"_cc_mon_with_hsbc": "12"},
+    {"_cc_mon_with_hsbc": "24.5"},
+    {"_cc_mon_with_hsbc": ""},
+    {"_cc_mon_with_hsbc": None}
 ]
 
 df = spark.createDataFrame(data)
 
-# Compute TEMP and CNT
-df = df.withColumn("TEMP", _sum(col("UTIL")))
-df = df.withColumn("CNT", size(col("UTIL")))
+# Convert string column to numeric column
+df = df.withColumn("cc_mon_with_hsbc", col("_cc_mon_with_hsbc").cast("double"))
 
-# Calculate AVUTIL3
-df = df.withColumn("AVUTIL3", col("TEMP") / col("CNT"))
-
-# Compute MAX_LMT
-df = df.withColumn("MAX_LMT", greatest("a_end_crd_lim_cust_m1", "a_end_crd_lim_cust_m2", "a_end_crd_lim_cust_m3"))
-
-# Apply the conditional logic
-df = df.withColumn(
-    "AVUTIL3",
-    when(col("MAX_LMT").isin(0, None), lit(-99999999999)).otherwise(col("AVUTIL3"))
-)
-
-# Select relevant columns for display
-df = df.select("UTIL", "TEMP", "CNT", "AVUTIL3", "MAX_LMT")
+# Replace missing values with 0
+df = df.withColumn("cc_mon_with_hsbc", when(col("cc_mon_with_hsbc").isNull(), 0).otherwise(col("cc_mon_with_hsbc")))
 
 # Show the result
 df.show(truncate=False)
@@ -54,21 +41,7 @@ df.show(truncate=False)
 ### Explanation:
 
 1. **Initialize Spark Session**: Creates a Spark session.
-2. **Example DataFrame**: Constructs a sample DataFrame with the `UTIL` array and credit limit columns.
-3. **Compute TEMP and CNT**:
-   - Use `_sum(col("UTIL"))` to sum the elements of the `UTIL` array and store the result in the `TEMP` column.
-   - Use `size(col("UTIL"))` to count the elements in the `UTIL` array and store the result in the `CNT` column.
-4. **Calculate AVUTIL3**: Compute the average of the `UTIL` array by dividing `TEMP` by `CNT`.
-5. **Compute MAX_LMT**: Use the `greatest` function to find the maximum value among `a_end_crd_lim_cust_m1`, `a_end_crd_lim_cust_m2`, and `a_end_crd_lim_cust_m3`.
-6. **Apply Conditional Logic**: Use the `when` function to set `AVUTIL3` to `-99999999999` if `MAX_LMT` is 0 or null; otherwise, keep the calculated `AVUTIL3`.
-7. **Select Relevant Columns**: Select the relevant columns for display.
-8. **Show the Result**: Display the resulting DataFrame.
-
-### Output:
-
-The output will be a DataFrame with the computed values:
-
-```
-+---------------------+-------+---+--------------+-------+
-|UTIL                 |TEMP   |CNT|AVUTIL3       |MAX_LMT|
-+---------------------+-------+---+
+2. **Example DataFrame**: Constructs a sample DataFrame with the `_cc_mon_with_hsbc` column as a string.
+3. **Convert String to Numeric**: Uses the `cast` function to convert the string column `_cc_mon_with_hsbc` to a double type and stores the result in a new column `cc_mon_with_hsbc`.
+4. **Replace Missing Values**: Uses the `when` function to check for null values in `cc_mon_with_hsbc` and replaces them with 0. The `otherwise` function retains the original values if they are not null.
+5. **Show the Result**: Displays the resulting DataFrame with the new `cc_mon
