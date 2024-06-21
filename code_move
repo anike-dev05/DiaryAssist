@@ -1,38 +1,51 @@
-To convert the given SAS code to PySpark, where you need to round the `UTIL` values to four decimal places and store them in `RUTIL`, you can follow these steps:
+To convert this SAS code to PySpark, we need to perform several steps:
+1. Compute the sum of the `UTIL` array and count the elements.
+2. Calculate the average `AVUTIL3`.
+3. Find the maximum value among `a_end_crd_lim_cust_m1`, `a_end_crd_lim_cust_m2`, and `a_end_crd_lim_cust_m3`.
+4. Apply the conditional logic to set `AVUTIL3`.
+
+Here’s how you can achieve this in PySpark:
 
 1. **Initialize Spark Session** if you don't have one already.
-2. **Create an example DataFrame** with the `UTIL` column.
-3. **Define a function to round each element in the `UTIL` array**.
-4. **Apply the function to create the `RUTIL` column**.
+2. **Create an example DataFrame** with the relevant columns.
+3. **Use PySpark functions to perform the computations**.
 
 Here's the complete PySpark code:
 
 ```python
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, udf
-from pyspark.sql.types import ArrayType, DoubleType
+from pyspark.sql.functions import col, array, sum as _sum, size, when, lit, greatest
 
 # Initialize Spark session
 spark = SparkSession.builder.appName("SAS to PySpark").getOrCreate()
 
 # Example DataFrame
 data = [
-    {"UTIL": [10.12345, 25.6789, 20.0]},
-    {"UTIL": [0.1111, 25.5555, 20.9999]},
-    {"UTIL": [23.333333, 20.0, 0.0]}
+    {"UTIL": [10.0, 25.0, 20.0], "a_end_crd_lim_cust_m1": 1000, "a_end_crd_lim_cust_m2": 2000, "a_end_crd_lim_cust_m3": 3000},
+    {"UTIL": [0.0, 25.0, 20.0], "a_end_crd_lim_cust_m1": 0, "a_end_crd_lim_cust_m2": 2000, "a_end_crd_lim_cust_m3": 3000},
+    {"UTIL": [23.3333, 20.0, 0.0], "a_end_crd_lim_cust_m1": 3000, "a_end_crd_lim_cust_m2": 4000, "a_end_crd_lim_cust_m3": None}
 ]
 
 df = spark.createDataFrame(data)
 
-# Define a function to round UTIL values to four decimal places
-def round_util(util):
-    return [round(u, 4) for u in util]
+# Compute TEMP and CNT
+df = df.withColumn("TEMP", _sum(col("UTIL")))
+df = df.withColumn("CNT", size(col("UTIL")))
 
-# Register the function as a UDF
-round_util_udf = udf(round_util, ArrayType(DoubleType()))
+# Calculate AVUTIL3
+df = df.withColumn("AVUTIL3", col("TEMP") / col("CNT"))
 
-# Apply the UDF to create the RUTIL column
-df = df.withColumn("RUTIL", round_util_udf(col("UTIL")))
+# Compute MAX_LMT
+df = df.withColumn("MAX_LMT", greatest("a_end_crd_lim_cust_m1", "a_end_crd_lim_cust_m2", "a_end_crd_lim_cust_m3"))
+
+# Apply the conditional logic
+df = df.withColumn(
+    "AVUTIL3",
+    when(col("MAX_LMT").isin(0, None), lit(-99999999999)).otherwise(col("AVUTIL3"))
+)
+
+# Select relevant columns for display
+df = df.select("UTIL", "TEMP", "CNT", "AVUTIL3", "MAX_LMT")
 
 # Show the result
 df.show(truncate=False)
@@ -41,24 +54,21 @@ df.show(truncate=False)
 ### Explanation:
 
 1. **Initialize Spark Session**: Creates a Spark session.
-2. **Example DataFrame**: Constructs a sample DataFrame with the `UTIL` column as an array.
-3. **Define a Function**: Defines a Python function `round_util` to round each element in the `UTIL` array to four decimal places.
-4. **Register the Function as a UDF**: Uses `udf` to register the function `round_util` as a User-Defined Function (UDF) in PySpark.
-5. **Apply the UDF**: Applies the UDF to the DataFrame to compute the `RUTIL` column with rounded values.
-6. **Show the Result**: Displays the resulting DataFrame with the new `RUTIL` column.
+2. **Example DataFrame**: Constructs a sample DataFrame with the `UTIL` array and credit limit columns.
+3. **Compute TEMP and CNT**:
+   - Use `_sum(col("UTIL"))` to sum the elements of the `UTIL` array and store the result in the `TEMP` column.
+   - Use `size(col("UTIL"))` to count the elements in the `UTIL` array and store the result in the `CNT` column.
+4. **Calculate AVUTIL3**: Compute the average of the `UTIL` array by dividing `TEMP` by `CNT`.
+5. **Compute MAX_LMT**: Use the `greatest` function to find the maximum value among `a_end_crd_lim_cust_m1`, `a_end_crd_lim_cust_m2`, and `a_end_crd_lim_cust_m3`.
+6. **Apply Conditional Logic**: Use the `when` function to set `AVUTIL3` to `-99999999999` if `MAX_LMT` is 0 or null; otherwise, keep the calculated `AVUTIL3`.
+7. **Select Relevant Columns**: Select the relevant columns for display.
+8. **Show the Result**: Display the resulting DataFrame.
 
 ### Output:
 
-The output will be a DataFrame with the `UTIL` and the newly calculated `RUTIL` columns:
+The output will be a DataFrame with the computed values:
 
 ```
-+---------------------+---------------------+
-|UTIL                 |RUTIL                |
-+---------------------+---------------------+
-|[10.12345, 25.6789, 20.0]|[10.1235, 25.6789, 20.0]  |
-|[0.1111, 25.5555, 20.9999]|[0.1111, 25.5555, 21.0]  |
-|[23.333333, 20.0, 0.0] |[23.3333, 20.0, 0.0]       |
-+---------------------+---------------------+
-```
-
-This PySpark code replicates the behavior of the SAS loop by rounding the `UTIL` values to four decimal places and storing them in the `RUTIL` column.
++---------------------+-------+---+--------------+-------+
+|UTIL                 |TEMP   |CNT|AVUTIL3       |MAX_LMT|
++---------------------+-------+---+
