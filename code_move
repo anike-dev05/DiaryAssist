@@ -1,29 +1,4 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, expr, ntile
-from pyspark.sql.window import Window
-import pyspark.sql.functions as F
 
-# Initialize Spark session
-spark = SparkSession.builder.appName("SAS to PySpark").getOrCreate()
-
-# Sample DataFrame
-data = [
-    {"gb_score": 10, "weight": 1},
-    {"gb_score": 20, "weight": 1},
-    {"gb_score": 30, "weight": 1},
-    {"gb_score": 40, "weight": 1},
-    {"gb_score": 50, "weight": 1},
-    {"gb_score": 60, "weight": 1},
-    {"gb_score": 70, "weight": 1},
-    {"gb_score": 80, "weight": 1},
-    {"gb_score": 90, "weight": 1},
-    {"gb_score": 100, "weight": 1}
-]
-
-df = spark.createDataFrame(data)
-
-# Calculate percentiles
-percentiles = df.approxQuantile("gb_score", [i/10 for i in range(11)], 0.001)
 
 # Create a DataFrame from percentiles
 percentiles_df = spark.createDataFrame([(percentiles,)], ["percentiles"])
@@ -32,26 +7,31 @@ percentiles_df = spark.createDataFrame([(percentiles,)], ["percentiles"])
 percentiles_df = percentiles_df.select(F.posexplode("percentiles").alias("decile", "gb_score"))
 
 # Assign deciles and calculate min/max scores
-df = df.withColumn("decile", 
-                   F.when(col("gb_score") <= percentiles[1], 0)
-                    .when(col("gb_score") <= percentiles[2], 1)
-                    .when(col("gb_score") <= percentiles[3], 2)
-                    .when(col("gb_score") <= percentiles[4], 3)
-                    .when(col("gb_score") <= percentiles[5], 4)
-                    .when(col("gb_score") <= percentiles[6], 5)
-                    .when(col("gb_score") <= percentiles[7], 6)
-                    .when(col("gb_score") <= percentiles[8], 7)
-                    .when(col("gb_score") <= percentiles[9], 8)
-                    .otherwise(9))
+df = df.withColumn(
+    "decile",
+    when(col("gb_score") <= percentiles[1], 0)
+    .when(col("gb_score") <= percentiles[2], 1)
+    .when(col("gb_score") <= percentiles[3], 2)
+    .when(col("gb_score") <= percentiles[4], 3)
+    .when(col("gb_score") <= percentiles[5], 4)
+    .when(col("gb_score") <= percentiles[6], 5)
+    .when(col("gb_score") <= percentiles[7], 6)
+    .when(col("gb_score") <= percentiles[8], 7)
+    .when(col("gb_score") <= percentiles[9], 8)
+    .otherwise(9)
+)
 
 # Create a DataFrame for the min/max scores
-min_max_scores = [(i, percentiles[i], percentiles[i+1]) for i in range(10)]
+min_max_scores = [(i, percentiles[i], percentiles[i + 1]) for i in range(10)]
 
 # Convert to DataFrame
-min_max_df = spark.createDataFrame(min_max_scores, ["decile", "min_gb_score", "max_gb_score"])
+min_max_df = spark.createDataFrame(min_max_scores, ["decile", "m1", "m2"])
 
 # Join with the original DataFrame to add min/max scores
 df = df.join(min_max_df, on="decile", how="left")
 
+# Select and rename columns for the final output
+final_df = df.select("decile", "m1", "m2")
+
 # Show the result
-df.show(truncate=False)
+final_df.show(truncate=False)
