@@ -1,73 +1,92 @@
-To convert the given SAS code to PySpark, we need to:
+Converting the provided SAS code to PySpark involves several steps. We need to:
 
-1. Check if the maximum value of a range of columns is missing (null).
-2. Based on this check, assign a value to the `BAD_18` column.
+1. Create a DataFrame equivalent to the `psi_band` data set.
+2. Define a mapping function to replace the `proc format` and convert `gb_score` values based on defined ranges.
+3. Apply the mapping to conditionally create the `PSI_BAND` column based on the `waterfall` column values.
 
-Here’s how you can achieve this in PySpark:
-
-1. **Create an example DataFrame** with the relevant columns.
-2. **Use PySpark functions** to perform the missing value check and conditionally assign the value to `BAD_18`.
-
-Here's the PySpark code:
+Below is the PySpark equivalent of your SAS code:
 
 ```python
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, greatest, when, array
+from pyspark.sql.functions import col, when, lit
 
-# Initialize Spark session
+# Create a Spark session
 spark = SparkSession.builder.appName("SAS to PySpark").getOrCreate()
 
-# Example DataFrame
-data = [
-    {"WODT0": 1, "WODT1": 2, "WODT18": 3, "DELQ0": 1, "DELQ1": 2, "DELQ18": 3},
-    {"WODT0": None, "WODT1": None, "WODT18": None, "DELQ0": 1, "DELQ1": 3, "DELQ18": 2},
-    {"WODT0": None, "WODT1": None, "WODT18": None, "DELQ0": None, "DELQ1": 1, "DELQ18": 2}
+# Sample data for psi_band DataFrame
+psi_band_data = [
+    ("Low-169",),
+    ("170-197",),
+    ("198-218",),
+    ("219-236",),
+    ("237-252",),
+    ("253-268",),
+    ("269-281",),
+    ("282-293",),
+    ("294-306",),
+    ("307-High",)
 ]
 
-df = spark.createDataFrame(data)
+psi_band_columns = ["SCOREBAND"]
+psi_band_df = spark.createDataFrame(psi_band_data, psi_band_columns)
 
-# List of columns
-wodt_columns = [f"WODT{i}" for i in range(19)]
-delq_columns = [f"DELQ{i}" for i in range(19)]
+# Sample data for stab_psi DataFrame
+stab_psi_data = [
+    ("Score Rejects", 180.0),
+    ("Stability Accepts", 250.0),
+    ("Other Category", 300.0)
+]
 
-# Check if the maximum of WODT columns is not null
-max_wodt = greatest(*[col(c) for c in wodt_columns])
+stab_psi_columns = ["waterfall", "gb_score"]
+stab_psi_df = spark.createDataFrame(stab_psi_data, stab_psi_columns)
 
-# Check if the maximum of DELQ columns is greater than or equal to 2
-max_delq = greatest(*[col(c) for c in delq_columns])
+# Define a function to map gb_score to PSI_BAND based on defined ranges
+def get_psi_band(score):
+    if score <= 169:
+        return "01:Low-169"
+    elif 170 <= score <= 197:
+        return "02:170-197"
+    elif 198 <= score <= 218:
+        return "03:198-218"
+    elif 219 <= score <= 236:
+        return "04:219-236"
+    elif 237 <= score <= 252:
+        return "05:237-252"
+    elif 253 <= score <= 268:
+        return "06:253-268"
+    elif 269 <= score <= 281:
+        return "07:269-281"
+    elif 282 <= score <= 293:
+        return "08:282-293"
+    elif 294 <= score <= 306:
+        return "09:294-306"
+    elif score >= 307:
+        return "10:307-HIGH"
+    else:
+        return None
 
-# Apply the condition to create the BAD_18 column
-df = df.withColumn(
-    "BAD_18",
-    when(max_wodt.isNotNull(), 1).otherwise(when(max_delq >= 2, 1).otherwise(0))
+# Register the function as a UDF
+from pyspark.sql.functions import udf
+from pyspark.sql.types import StringType
+
+get_psi_band_udf = udf(get_psi_band, StringType())
+
+# Apply the UDF conditionally to create PSI_BAND column
+stab_psi_df = stab_psi_df.withColumn(
+    "PSI_BAND",
+    when(
+        col("waterfall").isin("Score Rejects", "Stability Accepts"),
+        get_psi_band_udf(col("gb_score"))
+    ).otherwise(lit(None))
 )
 
-# Show the result
-df.show(truncate=False)
+# Show the resulting DataFrame
+stab_psi_df.show()
 ```
 
-### Explanation:
+This code will:
+1. Create a DataFrame for `psi_band` with the specified score bands.
+2. Define a function to map `gb_score` values to the corresponding `PSI_BAND` based on the provided ranges.
+3. Apply this function conditionally to the `stab_psi` DataFrame to create the `PSI_BAND` column only for rows where `waterfall` is either "Score Rejects" or "Stability Accepts".
 
-1. **Initialize Spark Session**: Creates a Spark session.
-2. **Example DataFrame**: Constructs a sample DataFrame with the `WODT` and `DELQ` columns.
-3. **List of Columns**: Create lists of the `WODT` and `DELQ` columns.
-4. **Check if Maximum of WODT Columns is Not Null**: Use the `greatest` function to find the maximum value among the `WODT` columns and check if it is not null.
-5. **Check if Maximum of DELQ Columns is Greater Than or Equal to 2**: Use the `greatest` function to find the maximum value among the `DELQ` columns and check if it is greater than or equal to 2.
-6. **Apply the Condition to Create the BAD_18 Column**: Use the `when` function to apply the conditional logic and create the `BAD_18` column.
-7. **Show the Result**: Display the resulting DataFrame.
-
-### Output:
-
-The output will be a DataFrame with the columns `WODT0`, `WODT1`, `WODT18`, `DELQ0`, `DELQ1`, `DELQ18`, and `BAD_18`:
-
-```
-+-----+-----+------+-----+-----+------+------+
-|WODT0|WODT1|WODT18|DELQ0|DELQ1|DELQ18|BAD_18|
-+-----+-----+------+-----+-----+------+------+
-|1    |2    |3     |1    |2    |3     |1     |
-|null |null |null  |1    |3    |2     |1     |
-|null |null |null  |null |1    |2     |1     |
-+-----+-----+------+-----+-----+------+------+
-```
-
-This PySpark code replicates the functionality of the SAS code by checking for missing values in the `WODT` columns and applying the conditional logic to create the `BAD_18` column.
+You should adapt the sample data to match your actual data. The logic in the `get_psi_band` function and the condition in the `when` clause directly map to the functionality provided by the SAS code.
