@@ -1,37 +1,42 @@
-To convert this SAS code to PySpark, we need to use PySpark DataFrame operations to achieve the same functionality. Here's the equivalent PySpark code:
+To convert the given SAS loop code to PySpark, we need to use PySpark's DataFrame operations. In this code, the goal is to compute a `UTIL` array based on the values in the `BAL` and `CRLIMIT` arrays. Here's a step-by-step approach to achieve this in PySpark:
 
-1. Check if `_a_end_crd_bal_cust_m1` contains any dashes (`'-'`).
-2. If it does, remove all dashes and prefix the result with a dash.
-3. Convert `_a_end_crd_bal_cust_m1` to a numeric value and store it in `a_end_crd_bal_cust_m1`.
+1. **Initialize Spark Session** if you don't have one already.
+2. **Create an example DataFrame** with the relevant columns.
+3. **Use PySpark functions to perform the computations.**
 
-Here is how you can do it in PySpark:
+Here’s the complete PySpark code:
 
 ```python
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import when, col, lit, regexp_replace
+from pyspark.sql.functions import col, when, array
 
 # Initialize Spark session
 spark = SparkSession.builder.appName("SAS to PySpark").getOrCreate()
 
 # Example DataFrame
 data = [
-    {"_a_end_crd_bal_cust_m1": "123-456"},
-    {"_a_end_crd_bal_cust_m1": "789"},
-    {"_a_end_crd_bal_cust_m1": ""}
+    {"BAL": [100, 200, 300], "CRLIMIT": [1000, 0, None]},
+    {"BAL": [400, 500, 600], "CRLIMIT": [0, 2000, 3000]},
+    {"BAL": [700, 800, 900], "CRLIMIT": [3000, 4000, 0]}
 ]
 
 df = spark.createDataFrame(data)
 
-# Process the DataFrame
-df = df.withColumn(
-    "_a_end_crd_bal_cust_m1_processed",
-    when(col("_a_end_crd_bal_cust_m1").contains("-"),
-         lit("-") + regexp_replace(col("_a_end_crd_bal_cust_m1"), "-", "")
-    ).otherwise(col("_a_end_crd_bal_cust_m1"))
-)
+# Define a function to calculate UTIL
+def calculate_util(bal, crlimit):
+    return [
+        0 if crlim in (0, None) else 100 * bal[i] / crlim
+        for i, crlim in enumerate(crlimit)
+    ]
 
-# Convert to numeric
-df = df.withColumn("a_end_crd_bal_cust_m1", col("_a_end_crd_bal_cust_m1_processed").cast("double"))
+# Register the function as a UDF
+from pyspark.sql.functions import udf
+from pyspark.sql.types import ArrayType, DoubleType
+
+calculate_util_udf = udf(calculate_util, ArrayType(DoubleType()))
+
+# Apply the UDF to create the UTIL column
+df = df.withColumn("UTIL", calculate_util_udf(col("BAL"), col("CRLIMIT")))
 
 # Show the result
 df.show(truncate=False)
@@ -39,13 +44,25 @@ df.show(truncate=False)
 
 ### Explanation:
 
-1. **Initialize Spark Session**: Create a Spark session.
-2. **Example DataFrame**: Create a sample DataFrame to demonstrate the transformation.
-3. **Process the DataFrame**:
-   - Use `when` and `contains` to check if `_a_end_crd_bal_cust_m1` contains a dash.
-   - If it does, remove all dashes using `regexp_replace` and prefix the result with a dash using `lit`.
-   - Otherwise, keep the original value.
-4. **Convert to Numeric**: Cast the processed column to a double.
-5. **Show the Result**: Display the resulting DataFrame.
+1. **Initialize Spark Session**: Creates a Spark session.
+2. **Example DataFrame**: Constructs a sample DataFrame with `BAL` and `CRLIMIT` columns as arrays.
+3. **Define a Function**: Defines a Python function `calculate_util` to compute the `UTIL` values based on the logic provided in the SAS code.
+4. **Register the Function as a UDF**: Uses `udf` to register the function `calculate_util` as a User-Defined Function (UDF) in PySpark.
+5. **Apply the UDF**: Applies the UDF to the DataFrame to compute the `UTIL` column.
+6. **Show the Result**: Displays the resulting DataFrame with the new `UTIL` column.
 
-This PySpark code achieves the same functionality as the original SAS code by processing the DataFrame with equivalent transformations.
+### Output:
+
+The output will be a DataFrame with the `BAL`, `CRLIMIT`, and the newly calculated `UTIL` columns:
+
+```
++------------+------------+------------------+
+|BAL         |CRLIMIT     |UTIL              |
++------------+------------+------------------+
+|[100, 200, 300]|[1000, 0, null]|[10.0, 0.0, 0.0]    |
+|[400, 500, 600]|[0, 2000, 3000]|[0.0, 25.0, 20.0]   |
+|[700, 800, 900]|[3000, 4000, 0]|[23.333333333333332, 20.0, 0.0]|
++------------+------------+------------------+
+```
+
+This PySpark code replicates the behavior of the SAS loop by calculating the `UTIL` values based on the conditions provided.
