@@ -1,42 +1,38 @@
-To convert the given SAS loop code to PySpark, we need to use PySpark's DataFrame operations. In this code, the goal is to compute a `UTIL` array based on the values in the `BAL` and `CRLIMIT` arrays. Here's a step-by-step approach to achieve this in PySpark:
+To convert the given SAS code to PySpark, where you need to round the `UTIL` values to four decimal places and store them in `RUTIL`, you can follow these steps:
 
 1. **Initialize Spark Session** if you don't have one already.
-2. **Create an example DataFrame** with the relevant columns.
-3. **Use PySpark functions to perform the computations.**
+2. **Create an example DataFrame** with the `UTIL` column.
+3. **Define a function to round each element in the `UTIL` array**.
+4. **Apply the function to create the `RUTIL` column**.
 
-Here’s the complete PySpark code:
+Here's the complete PySpark code:
 
 ```python
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when, array
+from pyspark.sql.functions import col, udf
+from pyspark.sql.types import ArrayType, DoubleType
 
 # Initialize Spark session
 spark = SparkSession.builder.appName("SAS to PySpark").getOrCreate()
 
 # Example DataFrame
 data = [
-    {"BAL": [100, 200, 300], "CRLIMIT": [1000, 0, None]},
-    {"BAL": [400, 500, 600], "CRLIMIT": [0, 2000, 3000]},
-    {"BAL": [700, 800, 900], "CRLIMIT": [3000, 4000, 0]}
+    {"UTIL": [10.12345, 25.6789, 20.0]},
+    {"UTIL": [0.1111, 25.5555, 20.9999]},
+    {"UTIL": [23.333333, 20.0, 0.0]}
 ]
 
 df = spark.createDataFrame(data)
 
-# Define a function to calculate UTIL
-def calculate_util(bal, crlimit):
-    return [
-        0 if crlim in (0, None) else 100 * bal[i] / crlim
-        for i, crlim in enumerate(crlimit)
-    ]
+# Define a function to round UTIL values to four decimal places
+def round_util(util):
+    return [round(u, 4) for u in util]
 
 # Register the function as a UDF
-from pyspark.sql.functions import udf
-from pyspark.sql.types import ArrayType, DoubleType
+round_util_udf = udf(round_util, ArrayType(DoubleType()))
 
-calculate_util_udf = udf(calculate_util, ArrayType(DoubleType()))
-
-# Apply the UDF to create the UTIL column
-df = df.withColumn("UTIL", calculate_util_udf(col("BAL"), col("CRLIMIT")))
+# Apply the UDF to create the RUTIL column
+df = df.withColumn("RUTIL", round_util_udf(col("UTIL")))
 
 # Show the result
 df.show(truncate=False)
@@ -45,24 +41,24 @@ df.show(truncate=False)
 ### Explanation:
 
 1. **Initialize Spark Session**: Creates a Spark session.
-2. **Example DataFrame**: Constructs a sample DataFrame with `BAL` and `CRLIMIT` columns as arrays.
-3. **Define a Function**: Defines a Python function `calculate_util` to compute the `UTIL` values based on the logic provided in the SAS code.
-4. **Register the Function as a UDF**: Uses `udf` to register the function `calculate_util` as a User-Defined Function (UDF) in PySpark.
-5. **Apply the UDF**: Applies the UDF to the DataFrame to compute the `UTIL` column.
-6. **Show the Result**: Displays the resulting DataFrame with the new `UTIL` column.
+2. **Example DataFrame**: Constructs a sample DataFrame with the `UTIL` column as an array.
+3. **Define a Function**: Defines a Python function `round_util` to round each element in the `UTIL` array to four decimal places.
+4. **Register the Function as a UDF**: Uses `udf` to register the function `round_util` as a User-Defined Function (UDF) in PySpark.
+5. **Apply the UDF**: Applies the UDF to the DataFrame to compute the `RUTIL` column with rounded values.
+6. **Show the Result**: Displays the resulting DataFrame with the new `RUTIL` column.
 
 ### Output:
 
-The output will be a DataFrame with the `BAL`, `CRLIMIT`, and the newly calculated `UTIL` columns:
+The output will be a DataFrame with the `UTIL` and the newly calculated `RUTIL` columns:
 
 ```
-+------------+------------+------------------+
-|BAL         |CRLIMIT     |UTIL              |
-+------------+------------+------------------+
-|[100, 200, 300]|[1000, 0, null]|[10.0, 0.0, 0.0]    |
-|[400, 500, 600]|[0, 2000, 3000]|[0.0, 25.0, 20.0]   |
-|[700, 800, 900]|[3000, 4000, 0]|[23.333333333333332, 20.0, 0.0]|
-+------------+------------+------------------+
++---------------------+---------------------+
+|UTIL                 |RUTIL                |
++---------------------+---------------------+
+|[10.12345, 25.6789, 20.0]|[10.1235, 25.6789, 20.0]  |
+|[0.1111, 25.5555, 20.9999]|[0.1111, 25.5555, 21.0]  |
+|[23.333333, 20.0, 0.0] |[23.3333, 20.0, 0.0]       |
++---------------------+---------------------+
 ```
 
-This PySpark code replicates the behavior of the SAS loop by calculating the `UTIL` values based on the conditions provided.
+This PySpark code replicates the behavior of the SAS loop by rounding the `UTIL` values to four decimal places and storing them in the `RUTIL` column.
