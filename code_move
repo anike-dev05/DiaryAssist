@@ -1,92 +1,58 @@
-Converting the provided SAS code to PySpark involves several steps. We need to:
+import random
+import pandas as pd
 
-1. Create a DataFrame equivalent to the `psi_band` data set.
-2. Define a mapping function to replace the `proc format` and convert `gb_score` values based on defined ranges.
-3. Apply the mapping to conditionally create the `PSI_BAND` column based on the `waterfall` column values.
+# Step 1: Generate 10,000 accounts
+num_accounts = 10000
 
-Below is the PySpark equivalent of your SAS code:
+# Generate random scores between 500 and 900
+scores = [random.randint(500, 900) for _ in range(num_accounts)]
 
-```python
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when, lit
+# Generate random good or bad flags
+flags = [random.choice(['good', 'bad']) for _ in range(num_accounts)]
 
-# Create a Spark session
-spark = SparkSession.builder.appName("SAS to PySpark").getOrCreate()
+# Generate random balances
+balances = [random.uniform(100, 10000) for _ in range(num_accounts)]
 
-# Sample data for psi_band DataFrame
-psi_band_data = [
-    ("Low-169",),
-    ("170-197",),
-    ("198-218",),
-    ("219-236",),
-    ("237-252",),
-    ("253-268",),
-    ("269-281",),
-    ("282-293",),
-    ("294-306",),
-    ("307-High",)
-]
+# Create a DataFrame for the accounts
+accounts_df = pd.DataFrame({
+    'score': scores,
+    'flag': flags,
+    'balance': balances
+})
 
-psi_band_columns = ["SCOREBAND"]
-psi_band_df = spark.createDataFrame(psi_band_data, psi_band_columns)
+# Step 2: Sort accounts by score
+accounts_df = accounts_df.sort_values(by='score')
 
-# Sample data for stab_psi DataFrame
-stab_psi_data = [
-    ("Score Rejects", 180.0),
-    ("Stability Accepts", 250.0),
-    ("Other Category", 300.0)
-]
+# Step 3: Define a function to compute the bad balance of a subset of accounts
+def calculate_bad_balance(df):
+    return df[df['flag'] == 'bad']['balance'].sum()
 
-stab_psi_columns = ["waterfall", "gb_score"]
-stab_psi_df = spark.createDataFrame(stab_psi_data, stab_psi_columns)
+# Step 4: Implement an algorithm to dynamically create score bands
+bands = 5
+total_bad_balance = calculate_bad_balance(accounts_df)
+target_bad_balance_increment = total_bad_balance / ((bands * (bands + 1)) / 2)
 
-# Define a function to map gb_score to PSI_BAND based on defined ranges
-def get_psi_band(score):
-    if score <= 169:
-        return "01:Low-169"
-    elif 170 <= score <= 197:
-        return "02:170-197"
-    elif 198 <= score <= 218:
-        return "03:198-218"
-    elif 219 <= score <= 236:
-        return "04:219-236"
-    elif 237 <= score <= 252:
-        return "05:237-252"
-    elif 253 <= score <= 268:
-        return "06:253-268"
-    elif 269 <= score <= 281:
-        return "07:269-281"
-    elif 282 <= score <= 293:
-        return "08:282-293"
-    elif 294 <= score <= 306:
-        return "09:294-306"
-    elif score >= 307:
-        return "10:307-HIGH"
-    else:
-        return None
+current_idx = 0
+score_bands = []
+bad_balances = []
 
-# Register the function as a UDF
-from pyspark.sql.functions import udf
-from pyspark.sql.types import StringType
+for i in range(1, bands + 1):
+    target_bad_balance = i * target_bad_balance_increment
+    current_bad_balance = 0
+    
+    while current_bad_balance < target_bad_balance and current_idx < len(accounts_df):
+        current_bad_balance += accounts_df.iloc[current_idx]['balance'] if accounts_df.iloc[current_idx]['flag'] == 'bad' else 0
+        current_idx += 1
+    
+    start_score = accounts_df.iloc[current_idx - 1]['score']
+    end_score = accounts_df.iloc[current_idx]['score'] if current_idx < len(accounts_df) else 900
+    
+    score_bands.append((start_score, end_score))
+    bad_balances.append(current_bad_balance)
 
-get_psi_band_udf = udf(get_psi_band, StringType())
+# Combine bands and bad balances
+band_balance_pairs = list(zip(score_bands, bad_balances))
 
-# Apply the UDF conditionally to create PSI_BAND column
-stab_psi_df = stab_psi_df.withColumn(
-    "PSI_BAND",
-    when(
-        col("waterfall").isin("Score Rejects", "Stability Accepts"),
-        get_psi_band_udf(col("gb_score"))
-    ).otherwise(lit(None))
-)
-
-# Show the resulting DataFrame
-stab_psi_df.show()
-```
-
-This code will:
-1. Create a DataFrame for `psi_band` with the specified score bands.
-2. Define a function to map `gb_score` values to the corresponding `PSI_BAND` based on the provided ranges.
-3. Apply this function conditionally to the `stab_psi` DataFrame to create the `PSI_BAND` column only for rows where `waterfall` is either "Score Rejects" or "Stability Accepts".
-
-You should adapt the sample data to match your actual data. The logic in the `get_psi_band` function and the condition in the `when` clause directly map to the functionality provided by the SAS code.
+print("Score bands with their bad balances:")
+for band, balance in band_balance_pairs:
+    print(f"Score band: {band[0]}-{band[1]}, Bad balance: {balance}")
