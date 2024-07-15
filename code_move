@@ -56,3 +56,18 @@ band_balance_pairs = list(zip(score_bands, bad_balances))
 print("Score bands with their bad balances:")
 for band, balance in band_balance_pairs:
     print(f"Score band: {band[0]}-{band[1]}, Bad balance: {balance}")
+
+
+.............
+
+To find the accounts missing in one table compared to another, you can use a `LEFT JOIN` combined with a `WHERE` clause to identify rows that exist in one table but not in the other. Here’s a query for finding the accounts present in `table1` but missing in `table2`:
+
+```sql
+SELECT t1.account_id
+FROM `project.dataset.table1` t1
+LEFT JOIN `project.dataset.table2` t2
+ON t1.account_id = t2.account_id
+WHERE t2.account_id IS NULL
+```
+
+This query assumes that the account ID field is named `account_id` in both tables and that the tables are located in the same dataset. If the field names or dataset locations differ, adjust the query accordingly.
