@@ -1,46 +1,48 @@
-To convert the given SAS code to PySpark, you need to use the PySpark DataFrame API to handle date conversions and conditional assignments. Here’s how you can do it:
+To convert the given SAS code snippet into PySpark syntax, you'll need to translate the SAS data step logic into PySpark DataFrame operations. Here's how you can do it:
 
-### Original SAS Code
-```sas
-%CONVERTDATE(R_AC_OPN_DT, AC_OPN_DATE);
-IF NOT MISSING AC_OPN_DATE THEN ACCOUNT_APENED_DT = PUT(AC_OPN_DATE, YYMMDD10.);
-```
-
-### Equivalent PySpark Code
 ```python
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when, date_format, to_date
+from pyspark.sql.functions import col, when, to_date
 
-# Initialize Spark session
-spark = SparkSession.builder.appName("Convert SAS to PySpark").getOrCreate()
+# Assuming you have a SparkSession already created
+spark = SparkSession.builder.appName("SAS to PySpark Conversion").getOrCreate()
 
-# Sample DataFrame for illustration
-# Assuming R_AC_OPN_DT and AC_OPN_DATE are columns in the DataFrame df
-data = [
-    ("2021-06-01", None),
-    ("2023-07-15", "2023-07-15"),
-    (None, "2022-05-20")
-]
-columns = ["R_AC_OPN_DT", "AC_OPN_DATE"]
-df = spark.createDataFrame(data, columns)
+# Example DataFrame with columns matching SAS variables
+data = spark.createDataFrame([
+    (12345, '2023-05-15'),
+    (67890, '2024-01-20')
+], ["MDC_RSTR_RELORIG_ACNO", "ACCOUNT_OPENED_DT"])
 
-# Convert R_AC_OPN_DT to AC_OPN_DATE (assuming the format is the same for simplicity)
-# If the date formats differ, additional conversion logic may be needed
-df = df.withColumn("AC_OPN_DATE", when(col("AC_OPN_DATE").isNull(), col("R_AC_OPN_DT")).otherwise(col("AC_OPN_DATE")))
+# Convert ACCOUNT_OPENED_DT to date format if not already done
+data = data.withColumn("AC_OPN_DATE", to_date(col("ACCOUNT_OPENED_DT"), 'yyyy-MM-dd'))
 
-# Apply the conditional assignment and format the date to 'yyyyMMdd'
-df = df.withColumn(
-    "ACCOUNT_APENED_DT",
-    when(col("AC_OPN_DATE").isNotNull(), date_format(to_date(col("AC_OPN_DATE"), 'yyyy-MM-dd'), 'yyyyMMdd'))
-)
+# Define the conditions and apply transformations
+data = data.withColumn("IFRS_RSTR_IND", 
+                       when((col("MDC_RSTR_RELORIG_ACNO") == "RSTR_DT1"), 'Y').otherwise('N'))
+
+data = data.withColumn("RSTR_DT1", to_date(col("RSTR_DT*1"), 'yyyyMMdd'))
+
+data = data.withColumn("D_RSTR_DT", to_date(col("DTRSTR_DT1"), 'yyyyMMdd'))
+
+data = data.withColumn("IFRS_RSTR_IND", 
+                       when((col("IFRS_RSTR_IND") == 'Y') & (col("AC_OPN_DATE") > col("D_RSTR_DT")), 'N').otherwise(col("IFRS_RSTR_IND")))
 
 # Show the resulting DataFrame
-df.show()
+data.show()
 ```
 
-### Explanation
-1. **Initialize Spark Session**: Create a Spark session.
-2. **Sample DataFrame**: For illustration purposes, a sample DataFrame is created. Replace it with your actual DataFrame.
-3. **Convert Date**: The date conversion logic assumes that if `AC_OPN_DATE` is null, it should take the value from `R_AC_OPN_DT`.
-4. **Conditional Assignment**: The `when` function is used to conditionally assign the value of `ACCOUNT_APENED_DT` if `AC_OPN_DATE` is not null. The `date_format` function formats the date in `yyyyMMdd` format.
-5. **Show DataFrame**: Display the resulting DataFrame to verify the changes.
+### Explanation:
+
+1. **DataFrame Creation**: `data` is created with example data and assumed columns (`MDC_RSTR_RELORIG_ACNO`, `ACCOUNT_OPENED_DT`).
+
+2. **Date Conversion**: `to_date()` function is used to convert string dates to `DateType` in PySpark.
+
+3. **Conditional Logic**:
+   - `IFRS_RSTR_IND` is derived using `when()` and `otherwise()` functions, similar to SAS `IF-THEN-ELSE` logic.
+   - Date comparisons (`AC_OPN_DATE > D_RSTR_DT`) are handled within `when()`.
+
+4. **Column Renaming**: Ensure that column names are adjusted to match your actual data schema in PySpark.
+
+5. **Output**: Finally, `data.show()` displays the transformed DataFrame.
+
+Adjust column names (`RSTR_DT*1`, `DTRSTR_DT1`, etc.) and formats (`yyyyMMdd`, `yyyy-MM-dd`, etc.) based on your actual data and requirements. This conversion approach should mirror the logic and transformations you need from SAS to PySpark.
