@@ -1,53 +1,22 @@
-To generate all possible combinations of ranges for your numeric variables and store sub dataframes in a list, you can use Python with pandas and itertools. Here's how you can achieve this:
+from pyspark.sql import functions as F
+from pyspark.sql.types import DoubleType
 
-```python
-import pandas as pd
-import itertools
+# Define UDFs for each utilization column
+def util1_udf(bal, crlimit):
+    return 0 if crlimit[0] in (0, None) else (bal[0] / crlimit[0]) * 100
 
-# Example dataframe with numeric variables
-df = pd.DataFrame({
-    'Var1': [1, 2, 3, 4, 5],
-    'Var2': [10, 20, 30, 40, 50],
-    'Var3': [100, 200, 300, 400, 500],
-    'Var4': [1000, 2000, 3000, 4000, 5000],
-    'Var5': [10000, 20000, 30000, 40000, 50000]
-})
+def util2_udf(bal, crlimit):
+    return 0 if crlimit[1] in (0, None) else (bal[1] / crlimit[1]) * 100
 
-# Example ranges for each variable
-ranges = {
-    'Var1': [(1, 2), (3, 4), (5, 6)],
-    'Var2': [(10, 20), (30, 40), (50, 60)],
-    'Var3': [(100, 200), (300, 400), (500, 600)],
-    'Var4': [(1000, 2000), (3000, 4000), (5000, 6000)],
-    'Var5': [(10000, 20000), (30000, 40000), (50000, 60000)]
-}
+def util3_udf(bal, crlimit):
+    return 0 if crlimit[2] in (0, None) else (bal[2] / crlimit[2]) * 100
 
-# Generate all combinations of ranges
-combinations = list(itertools.product(*ranges.values()))
+# Register the UDFs
+util1_udf = F.udf(util1_udf, DoubleType())
+util2_udf = F.udf(util2_udf, DoubleType())
+util3_udf = F.udf(util3_udf, DoubleType())
 
-# Function to generate sub-dataframes
-def generate_subframes(df, combinations):
-    subframes = []
-    for combo in combinations:
-        sub_df = df.copy()
-        for i, var_name in enumerate(ranges.keys()):
-            sub_df = sub_df[(sub_df[var_name] >= combo[i][0]) & (sub_df[var_name] <= combo[i][1])]
-        subframes.append(sub_df)
-    return subframes
-
-# Generate sub-dataframes
-sub_dataframes = generate_subframes(df, combinations)
-
-# Print the number of sub-dataframes and an example of accessing one
-print(f"Number of sub-dataframes generated: {len(sub_dataframes)}")
-print("Example of accessing a sub-dataframe:")
-print(sub_dataframes[0])  # Example: Accessing the first sub-dataframe
-```
-
-In this code:
-- `df` is your original dataframe with numeric variables.
-- `ranges` is a dictionary where keys are variable names ('Var1', 'Var2', ...) and values are lists of tuples representing ranges.
-- `itertools.product(*ranges.values())` generates all combinations of the ranges specified.
-- `generate_subframes` function iterates through each combination, filters the original dataframe `df` based on the ranges, and appends the filtered dataframe to `subframes`.
-
-Adjust the ranges and dataframe `df` according to your actual data and ranges. This approach efficiently generates and stores all possible sub-dataframes based on the specified variable ranges.
+# Apply the UDFs to create the three columns in the DataFrame
+df = df.withColumn('util1', util1_udf(F.col('bal'), F.col('crlimit'))) \
+       .withColumn('util2', util2_udf(F.col('bal'), F.col('crlimit'))) \
+       .withColumn('util3', util3_udf(F.col('bal'), F.col('crlimit')))
