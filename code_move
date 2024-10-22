@@ -1,22 +1,46 @@
 from pyspark.sql import functions as F
-from pyspark.sql.types import DoubleType
+from pyspark.sql import SparkSession
+from pyspark.sql import Window
 
-# Define UDFs for each utilization column
-def util1_udf(bal, crlimit):
-    return 0 if crlimit[0] in (0, None) else (bal[0] / crlimit[0]) * 100
+# Initialize Spark session
+spark = SparkSession.builder.appName("DecileAssignment").getOrCreate()
 
-def util2_udf(bal, crlimit):
-    return 0 if crlimit[1] in (0, None) else (bal[1] / crlimit[1]) * 100
+# Assuming 'perf1' is your initial DataFrame with columns 'gb_score' and 'weight'
 
-def util3_udf(bal, crlimit):
-    return 0 if crlimit[2] in (0, None) else (bal[2] / crlimit[2]) * 100
+# Step 1: Calculate Percentiles (equivalent to SAS 'proc univariate')
+percentiles = perf1.approxQuantile("gb_score", [x / 10.0 for x in range(11)], 0.01)
 
-# Register the UDFs
-util1_udf = F.udf(util1_udf, DoubleType())
-util2_udf = F.udf(util2_udf, DoubleType())
-util3_udf = F.udf(util3_udf, DoubleType())
+# Create a DataFrame for percentiles
+percentile_df = spark.createDataFrame([(i, percentiles[i]) for i in range(len(percentiles))], ["decile", "gb_score"])
 
-# Apply the UDFs to create the three columns in the DataFrame
-df = df.withColumn('util1', util1_udf(F.col('bal'), F.col('crlimit'))) \
-       .withColumn('util2', util2_udf(F.col('bal'), F.col('crlimit'))) \
-       .withColumn('util3', util3_udf(F.col('bal'), F.col('crlimit')))
+# Step 2: Manually Transpose the Percentiles
+transposed_percentiles = percentile_df.groupBy().pivot("decile").agg(F.first("gb_score"))
+transposed_percentiles.show()
+
+# Step 3: Assigning Percentiles to Variables
+percentile_values = {f"r{i+1}": percentiles[i] for i in range(len(percentiles))}
+m1 = "Min_gb_score"
+m2 = "Max_gb_score"
+
+# Step 4: Function to Assign Decile Based on Percentiles
+def assign_decile(gb_score):
+    if gb_score <= percentile_values["r2"]:
+        return 0
+    elif gb_score <= percentile_values["r3"]:
+        return 1
+    # Add further conditions for each decile
+    else:
+        return None  # In case it doesn't fit any condition
+
+# Registering the Python function as a UDF in Spark
+assign_decile_udf = F.udf(assign_decile)
+
+# Apply the logic to create the decile column
+sort_perf = perf1.withColumn("decile", assign_decile_udf(F.col("gb_score")))
+
+# Step 5: Add Columns for Min_gb_score and Max_gb_score Based on Decile
+sort_perf = sort_perf.withColumn(m1, F.lit(percentile_values["r1"])) \
+                     .withColumn(m2, F.lit(percentile_values["r2"]))
+
+# Display the final DataFrame
+sort_perf.show()
